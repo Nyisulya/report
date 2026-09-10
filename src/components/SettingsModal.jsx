@@ -1,42 +1,19 @@
 import React, { useState } from 'react';
-import { X, Key, Cpu, Sparkles, CheckCircle2, ShieldCheck, Zap, AlertTriangle } from 'lucide-react';
+import { X, Key, Cpu, Sparkles, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { getGoogleClientId, saveGoogleClientId } from '../services/googleAuth';
 import { GoogleIcon } from './GoogleAuthButton';
 
-const AI_MODELS = [
-  {
-    id: 'deepseek-v4-flash',
-    name: 'DeepSeek V4 Flash (deepseek-v4-flash)',
-    provider: 'DeepSeek AI',
-    badge: 'Default • Ultra Fast',
-    desc: 'High-speed conversational engine optimized for live document generation and instant structuring.'
-  },
-  {
-    id: 'deepseek-chat',
-    name: 'DeepSeek V3 (deepseek-chat)',
-    provider: 'DeepSeek AI',
-    badge: 'Flagship Academic',
-    desc: 'Flagship model for high-density academic reports, engineering specifications, and formal standard formatting.'
-  },
-  {
-    id: 'deepseek-reasoner',
-    name: 'DeepSeek R1 (deepseek-reasoner)',
-    provider: 'DeepSeek AI',
-    badge: 'Deep Reasoning',
-    desc: 'Advanced reasoning engine for complex engineering calculations, technical friction, and standards validation.'
-  }
-];
+export const EXCLUSIVE_MODEL = 'deepseek-flash';
 
 export default function SettingsModal({
   isOpen,
   onClose,
   apiKey,
   onSaveApiKey,
-  selectedModel,
+  selectedModel = EXCLUSIVE_MODEL,
   onSelectModel
 }) {
   const [tempKey, setTempKey] = useState(apiKey || '');
-  const [model, setModel] = useState(selectedModel || 'deepseek-chat');
   const [clientId, setClientId] = useState(() => getGoogleClientId());
   const [isSaved, setIsSaved] = useState(false);
 
@@ -45,7 +22,7 @@ export default function SettingsModal({
   const handleSave = (e) => {
     e.preventDefault();
     onSaveApiKey(tempKey.trim());
-    onSelectModel(model);
+    if (onSelectModel) onSelectModel(EXCLUSIVE_MODEL);
     saveGoogleClientId(clientId);
     setIsSaved(true);
     setTimeout(() => {
@@ -56,7 +33,7 @@ export default function SettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-xl rounded-2xl bg-[#171717] border border-[#2e2e2e] shadow-2xl p-6 relative overflow-hidden">
+      <div className="w-full max-w-xl rounded-2xl bg-[#171717] border border-[#2e2e2e] shadow-2xl p-6 relative overflow-hidden font-sans">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-[#2e2e2e]">
           <div className="flex items-center space-x-3">
@@ -65,10 +42,10 @@ export default function SettingsModal({
             </div>
             <div>
               <h3 className="font-bold text-slate-100 text-base">
-                AI Engine & DeepSeek API Settings
+                AI Engine & API Settings
               </h3>
               <p className="text-xs text-slate-400">
-                Inaendeshwa na <strong>DeepSeek AI Engine</strong> kwa ripoti za kiwango cha juu cha kihandisi.
+                Usimamizi wa vigezo vya AI na API key kwa uandishi sahihi wa ripoti za kihandisi.
               </p>
             </div>
           </div>
@@ -87,7 +64,7 @@ export default function SettingsModal({
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 flex items-center justify-between">
               <span className="flex items-center space-x-1.5">
                 <Key className="w-3.5 h-3.5 text-amber-400" />
-                <span>DeepSeek API Key</span>
+                <span>AI Engine API Key</span>
               </span>
               <span className="text-[11px] font-mono text-emerald-400">
                 Active Key Loaded
@@ -103,7 +80,7 @@ export default function SettingsModal({
               />
             </div>
             <p className="text-[11px] text-slate-400 mt-1.5">
-              Ingiza DeepSeek API key yako hapa au weka kwenye faili la .env (VITE_DEEPSEEK_API_KEY).
+              Ingiza API key yako hapa au weka kwenye faili la .env kwenye server.
             </p>
           </div>
 
@@ -132,57 +109,40 @@ export default function SettingsModal({
             </p>
           </div>
 
-          {/* Model Selection */}
+          {/* Exclusive Single Model Display */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2 flex items-center space-x-1.5">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Chagua Model ya AI</span>
+              <span>Model ya AI Inayotumika (Exclusive AI Engine)</span>
             </label>
-            <div className="space-y-2">
-              {AI_MODELS.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => setModel(item.id)}
-                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                    model === item.id
-                      ? 'bg-amber-500/10 border-amber-500/60 ring-1 ring-amber-500/30'
-                      : 'bg-[#121212] border-[#292929] hover:border-[#383838] hover:bg-[#1a1a1a]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-bold text-xs text-slate-100">
-                        {item.name}
-                      </span>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
-                        {item.provider}
-                      </span>
-                    </div>
-                    {model === item.id ? (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-bold">
-                        Active
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-slate-500">
-                        {item.badge}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    {item.desc}
-                  </p>
+            
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/40 ring-1 ring-amber-500/20 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="font-bold text-xs text-amber-300">
+                    Flash Engine (v4.1 High Precision)
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-semibold font-mono">
+                    1M Context
+                  </span>
                 </div>
-              ))}
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-bold">
+                  ACTIVE
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Injini ya kiwango cha juu yenye 1M Context Window, 64K Max Output, na uwezo wa uchambuzi wa kiufundi kwa ajili ya kuandaa ripoti rasmi.
+              </p>
             </div>
           </div>
 
-          {/* Status Indicator */}
+          {/* Anti-AI Status Indicator */}
           <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/40 flex items-start space-x-2.5">
             <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
             <div className="text-xs text-emerald-200">
-              <span className="font-semibold">DeepSeek Anti-AI & Academic Rigor Mode: Imewashwa (Active)</span>
+              <span className="font-semibold">Academic Quality & Authenticity Filter: Imewashwa (Active)</span>
               <p className="text-[11px] text-emerald-300/80 mt-0.5">
-                Misamiati yote ya AI (delve, pivotal, seamless, n.k.) inachujwa na kuondolewa ili ripoti iwe 100% authentic.
+                Misamiati ya kijumla na ya kubahatisha inachujwa na kuondolewa ili ripoti iwe halisi na yenye viwango vya kitaaluma.
               </p>
             </div>
           </div>

@@ -4,7 +4,8 @@ import {
   PenSquare, 
   BookOpen, 
   Trash2, 
-  PanelLeftClose
+  PanelLeftClose,
+  ShieldCheck
 } from 'lucide-react';
 import { GoogleSignInButton } from './GoogleAuthButton';
 
@@ -18,6 +19,7 @@ export default function Sidebar({
   onNewChat,
   onOpenProfile,
   onOpenLogbook,
+  onOpenAdmin,
   metadata,
   googleUser,
   onGoogleLogin
@@ -151,48 +153,64 @@ export default function Sidebar({
           )}
         </div>
 
-        {/* Bottom User Profile Section: Dynamic based on actual Login State */}
-        <div className="p-3 border-t border-[#282a2c] bg-[#1e1f20] shrink-0">
-          {googleUser ? (
+        {/* Bottom User Profile Section with subtle discreet admin trigger */}
+        <div className="p-3 border-t border-[#282a2c] bg-[#1e1f20] shrink-0 flex items-center justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            {googleUser ? (
+              <button
+                onClick={() => {
+                  onOpenProfile();
+                  if (window.innerWidth < 768) onClose();
+                }}
+                className="w-full flex items-center space-x-2.5 p-1 -ml-1 rounded-full hover:bg-[#282a2c] text-left transition group"
+                title="Fungua Profaili ya Mtumiaji"
+              >
+                {googleUser.picture ? (
+                  <img
+                    src={googleUser.picture}
+                    alt={googleUser.name}
+                    className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-blue-500"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(googleUser.name || 'G')}`;
+                    }}
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-[#4285f4] text-white flex items-center justify-center text-xs font-semibold shrink-0 shadow-sm">
+                    {(googleUser.name || 'G').charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium text-slate-200 truncate group-hover:text-white">
+                    {googleUser.name}
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono truncate">
+                    {googleUser.email}
+                  </div>
+                </div>
+              </button>
+            ) : (
+              <div className="w-full">
+                <GoogleSignInButton 
+                  onLoginSuccess={onGoogleLogin} 
+                  className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-full bg-white hover:bg-slate-100 text-slate-900 font-medium text-xs shadow-sm transition active:scale-98"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Hidden Discrete Admin Icon Trigger */}
+          {onOpenAdmin && (
             <button
               onClick={() => {
-                onOpenProfile();
+                onOpenAdmin();
                 if (window.innerWidth < 768) onClose();
               }}
-              className="w-full flex items-center space-x-2.5 p-1 -ml-1 rounded-full hover:bg-[#282a2c] text-left transition group"
-              title="Fungua Profaili ya Mtumiaji"
+              className="p-1.5 rounded-lg text-slate-600 hover:text-slate-400 hover:bg-[#282a2c] transition shrink-0 opacity-40 hover:opacity-100"
+              title="Mfumo"
             >
-              {googleUser.picture ? (
-                <img
-                  src={googleUser.picture}
-                  alt={googleUser.name}
-                  className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-blue-500"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(googleUser.name || 'G')}`;
-                  }}
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-[#4285f4] text-white flex items-center justify-center text-xs font-semibold shrink-0 shadow-sm">
-                  {(googleUser.name || 'G').charAt(0).toUpperCase()}
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-medium text-slate-200 truncate group-hover:text-white">
-                  {googleUser.name}
-                </div>
-                <div className="text-[10px] text-slate-400 font-mono truncate">
-                  {googleUser.email}
-                </div>
-              </div>
+              <ShieldCheck className="w-3.5 h-3.5" />
             </button>
-          ) : (
-            <div className="w-full">
-              <GoogleSignInButton 
-                onLoginSuccess={onGoogleLogin} 
-                className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-full bg-white hover:bg-slate-100 text-slate-900 font-medium text-xs shadow-sm transition active:scale-98"
-              />
-            </div>
           )}
         </div>
       </aside>

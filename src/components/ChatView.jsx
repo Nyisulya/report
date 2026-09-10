@@ -27,11 +27,13 @@ import {
   Columns,
   Maximize2,
   FileDown,
-  Plus
+  Plus,
+  X
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sendChatMessageToAI, DEFAULT_MODEL } from '../services/aiEngine.js';
 import GoogleAuthButton from './GoogleAuthButton.jsx';
+import { analyticsService } from '../services/analyticsService.js';
 
 export default function ChatView({
   metadata,
@@ -48,6 +50,7 @@ export default function ChatView({
   onOpenProfile,
   onOpenStructures,
   onOpenLogbook,
+  onOpenAdmin,
   onSelectChapter,
   isSplitView,
   onToggleSplitView,
@@ -94,7 +97,7 @@ export default function ChatView({
       {
         id: 'welcome',
         sender: 'ai',
-        text: `Habari ndugu mwanafunzi! Karibu sana kwenye **Field Report AI Assistant** (DeepSeek v4 Flash). 🎓\n\nNipo hapa kukuandikia ripoti yako rasmi ya **Industrial Practical Training (IPT)** kuanzia mwanzo hadi mwisho kulingana na viwango rasmi vya kitaaluma. Kila kitu kinachoandikwa kinaingia moja kwa moja kwenye **A4 Document hapo pembeni**.\n\nTuanze kwa kukamilisha **Cover Page** yako: **Jina lako kamili la mwanafunzi unaitwa nani?**`,
+        text: `Habari ndugu mwanafunzi! Karibu sana kwenye **Field Report AI Assistant**. 🎓\n\nNipo hapa kukuandikia ripoti yako rasmi ya **Industrial Practical Training (IPT)** kuanzia mwanzo hadi mwisho kulingana na viwango rasmi vya kitaaluma. Kila kitu kinachoandikwa kinaingia moja kwa moja kwenye **A4 Document hapo pembeni**.\n\nTuanze kwa kukamilisha **Cover Page** yako: **Jina lako kamili la mwanafunzi unaitwa nani?**`,
         chips: ['FELICIAN JOHN MUSSA', 'CHILLU JOHN MWITA', 'JUMA ALLY SELEMANI', 'NEEMA A. MWAKYUSA']
       }
     ];
@@ -206,7 +209,7 @@ export default function ChatView({
       setMessages(prev => [...prev, aiMsg]);
     } catch (err) {
       console.error('DeepSeek generation error:', err);
-      setErrorMsg(err.message || 'Hitilafu ya mtandao katika kuwasiliana na DeepSeek API.');
+      setErrorMsg(err.message || 'Hitilafu ya mtandao katika kuwasiliana na mfumo wa AI.');
 
       setMessages(prev => [
         ...prev,
@@ -222,17 +225,65 @@ export default function ChatView({
     }
   };
 
+  const [activeAnnouncement, setActiveAnnouncement] = useState(() => analyticsService.getAnnouncement());
+
+  // Periodically refresh announcement banner
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveAnnouncement(analyticsService.getAnnouncement());
+    }, 8000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Global subtle shortcut for Admin: Ctrl + Shift + A or Alt + A
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') || (e.altKey && e.key.toLowerCase() === 'a')) {
+        e.preventDefault();
+        if (onOpenAdmin) onOpenAdmin();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onOpenAdmin]);
+
   return (
     <div className="flex-1 flex flex-col h-full bg-[#212121] text-slate-100 overflow-hidden relative">
-      {/* Top Header - Clean, minimal & spacious ("peupe kabisa") */}
+      {/* Global System Announcement Banner (If active) */}
+      {activeAnnouncement?.active && (
+        <div className={`px-4 py-2 text-xs flex items-center justify-between z-20 border-b shadow-sm ${
+          activeAnnouncement.type === 'warning'
+            ? 'bg-amber-500/15 border-amber-500/30 text-amber-200'
+            : activeAnnouncement.type === 'success'
+            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200'
+            : 'bg-blue-500/15 border-blue-500/30 text-blue-200'
+        }`}>
+          <div className="flex items-center space-x-2 truncate">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            <span className="font-semibold shrink-0">Tangazo la Mfumo:</span>
+            <span className="truncate">{activeAnnouncement.message}</span>
+          </div>
+          <button
+            onClick={() => setActiveAnnouncement(prev => ({ ...prev, active: false }))}
+            className="p-1 text-slate-400 hover:text-white rounded ml-2 shrink-0"
+            title="Funga Tangazo"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Top Header - Clean & Minimal */}
       <header className="h-12 px-3 pt-2 flex items-center justify-between shrink-0 z-10 bg-transparent">
-        <button
-          onClick={onOpenSidebar}
-          className="p-2 rounded-full text-slate-400 hover:text-slate-100 hover:bg-[#282828]/60 transition"
-          title="Fungua / Funga Sidebar"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={onOpenSidebar}
+            className="p-2 rounded-full text-slate-400 hover:text-slate-100 hover:bg-[#282828]/60 transition"
+            title="Fungua / Funga Sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* Mobile Document Preview Button */}
         <div className="flex items-center space-x-2 lg:hidden">
@@ -339,7 +390,7 @@ export default function ChatView({
             <div className="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
             </div>
-            <span>DeepSeek inaandika moja kwa moja kwenye Document yako...</span>
+            <span>AI inaandika moja kwa moja kwenye Document yako...</span>
           </div>
         )}
 

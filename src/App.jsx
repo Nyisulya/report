@@ -6,11 +6,13 @@ import DocumentDrawer from './components/DocumentDrawer';
 import ProfileSetupModal from './components/ProfileSetupModal';
 import StructureModal from './components/StructureModal';
 import WeeklyLogbookModal from './components/WeeklyLogbookModal';
+import AdminDashboard from './components/AdminDashboard';
 import { INITIAL_REPORT_STATE } from './data/ditTemplates';
 import { UNIVERSITY_STRUCTURES, getUniversityStructure } from './data/universityStructures';
 import { exportDITReportToDocx } from './services/docxExporter';
 import { synchronizeReport } from './services/reportSynchronizer';
 import { getStoredGoogleUser, saveGoogleUser, removeGoogleUser } from './services/googleAuth';
+import { analyticsService } from './services/analyticsService';
 
 export default function App() {
   // Google Authentication State
@@ -28,6 +30,21 @@ export default function App() {
         avatar: userData.picture || prev.metadata?.avatar
       }
     }));
+
+    // Record telemetry for active student
+    try {
+      analyticsService.recordStudentActivity({
+        name: userData.name,
+        email: userData.email,
+        avatar: userData.picture,
+        university: reportData?.metadata?.universityName || 'DIT',
+        department: reportData?.metadata?.department || 'Engineering / IT',
+        company: reportData?.metadata?.firm || reportData?.metadata?.companyName || 'Field Company',
+        regNumber: reportData?.metadata?.registrationNumber || 'N/A'
+      });
+    } catch (err) {
+      console.warn('Analytics tracking error:', err);
+    }
   };
 
   const handleGoogleLogout = () => {
@@ -121,7 +138,13 @@ export default function App() {
 
   // Settings State
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('deepseek_api_key') || '');
-  const [activeModel, setActiveModel] = useState(() => localStorage.getItem('deepseek_model') || 'deepseek-v4-flash');
+  const [activeModel, setActiveModel] = useState(() => {
+    const saved = localStorage.getItem('deepseek_model');
+    if (!saved || saved.includes('v4.1-flash') || saved.includes('chat') || saved.includes('reasoner')) {
+      return 'deepseek-flash';
+    }
+    return saved;
+  });
 
   // UI Drawer & Modal states
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
@@ -129,6 +152,7 @@ export default function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isStructureModalOpen, setIsStructureModalOpen] = useState(false);
   const [isLogbookModalOpen, setIsLogbookModalOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [activeChapterTab, setActiveChapterTab] = useState('cover');
   const [isSplitView, setIsSplitView] = useState(true);
@@ -477,6 +501,10 @@ export default function App() {
           setIsSidebarOpen(false);
           setIsLogbookModalOpen(true);
         }}
+        onOpenAdmin={() => {
+          setIsSidebarOpen(false);
+          setIsAdminOpen(true);
+        }}
         metadata={reportData.metadata}
         googleUser={googleUser}
         onGoogleLogin={handleGoogleLogin}
@@ -505,6 +533,7 @@ export default function App() {
             onOpenProfile={() => setIsProfileOpen(true)}
             onOpenStructures={() => setIsStructureModalOpen(true)}
             onOpenLogbook={() => setIsLogbookModalOpen(true)}
+            onOpenAdmin={() => setIsAdminOpen(true)}
             onSelectChapter={(tab) => setActiveChapterTab(tab)}
             isSplitView={isSplitView}
             onToggleSplitView={() => setIsSplitView(!isSplitView)}
@@ -548,6 +577,11 @@ export default function App() {
       />
 
       {/* Modals */}
+      <AdminDashboard
+        isOpen={isAdminOpen}
+        onClose={() => setIsAdminOpen(false)}
+      />
+
       <StructureModal
         isOpen={isStructureModalOpen}
         onClose={() => setIsStructureModalOpen(false)}

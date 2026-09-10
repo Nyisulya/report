@@ -1,8 +1,9 @@
 import { getVivaTipForActivity } from '../data/vivaQuestions.js';
 import { getUniversityStructure } from '../data/universityStructures.js';
+import { analyticsService } from './analyticsService.js';
 
-export const DEFAULT_DEEPSEEK_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY || 'sk-1bf108148bc9431f9dca10ab133f849c';
-export const DEFAULT_MODEL = 'deepseek-chat';
+export const DEFAULT_DEEPSEEK_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY || '';
+export const DEFAULT_MODEL = 'deepseek-flash';
 
 // Anti-AI cliché filtering
 export const BANNED_AI_WORDS = [
@@ -256,7 +257,7 @@ export async function sendChatMessageToAI({
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(`DeepSeek API Error: ${res.status} - ${errText}`);
+      throw new Error(`AI Engine Error: ${res.status} - ${errText}`);
     }
 
     const data = await res.json();
@@ -281,6 +282,25 @@ export async function sendChatMessageToAI({
       } catch (e) {
         console.warn('Failed to parse action JSON block:', e);
       }
+    }
+
+    // Record analytics telemetry
+    try {
+      const studentName = reportData?.metadata?.studentName || '';
+      const university = reportData?.metadata?.universityName || 'DIT';
+      const promptText = messages.map(m => m.text).join(' ');
+      const totalTokensUsage = data?.usage?.total_tokens || Math.round(((promptText.length + rawContent.length) / 3.8));
+
+      analyticsService.recordAiGeneration({
+        promptText,
+        responseText: rawContent,
+        studentName,
+        university,
+        tokensEstimated: totalTokensUsage,
+        modelName: activeModel
+      });
+    } catch (telemetryErr) {
+      console.warn('Analytics telemetry recording error:', telemetryErr);
     }
 
     return {
@@ -363,7 +383,7 @@ Return JSON in this format only:
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(`DeepSeek API error: ${res.status} - ${errText}`);
+      throw new Error(`AI Engine error: ${res.status} - ${errText}`);
     }
 
     const data = await res.json();
@@ -487,7 +507,7 @@ RULES:
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(`DeepSeek API error: ${res.status} - ${errText}`);
+      throw new Error(`AI Engine error: ${res.status} - ${errText}`);
     }
 
     const data = await res.json();
@@ -548,7 +568,7 @@ export async function generateWeeklyLogbookEntry({
   companyName = ''
 }) {
   const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_DEEPSEEK_KEY;
-  const activeModel = (modelName && modelName.toLowerCase().includes('reasoner')) ? modelName : 'deepseek-chat';
+  const activeModel = modelName || DEFAULT_MODEL;
   const deptName = department?.name || 'Engineering';
   const firm = companyName || 'Host Firm';
 
@@ -759,7 +779,7 @@ CRITICAL INSTRUCTIONS FOR AUTHENTICITY, VARIETY & FLEXIBILITY:
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(`DeepSeek API error: ${res.status} - ${errText}`);
+      throw new Error(`AI Engine error: ${res.status} - ${errText}`);
     }
 
     const data = await res.json();

@@ -19,6 +19,7 @@ import {
 } from 'docx';
 import { saveAs } from 'file-saver';
 import { buildDynamicTableOfContents, buildDynamicTableOfFigures } from './reportSynchronizer';
+import { analyticsService } from './analyticsService';
 
 export async function exportDITReportToDocx(reportData) {
   const { metadata = {}, preliminaries = {}, chapters = [] } = reportData || {};
@@ -286,6 +287,17 @@ export async function exportDITReportToDocx(reportData) {
   const cleanStudent = (metadata.studentName || 'Student').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
   const cleanFilename = `${uniAcronym}_Report_${cleanStudent}.docx`;
   saveAs(blob, cleanFilename);
+
+  // Record analytics telemetry
+  try {
+    analyticsService.recordDocxExport({
+      studentName: metadata.studentName || 'Student',
+      university: uniAcronym || 'DIT',
+      pages: 32
+    });
+  } catch (err) {
+    console.warn('Failed to record docx export telemetry:', err);
+  }
 }
 
 const noBorders = {
