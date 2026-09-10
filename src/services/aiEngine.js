@@ -1,6 +1,7 @@
 import { getVivaTipForActivity } from '../data/vivaQuestions.js';
 import { getUniversityStructure } from '../data/universityStructures.js';
 
+export const DEFAULT_DEEPSEEK_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY || 'sk-1bf108148bc9431f9dca10ab133f849c';
 export const DEFAULT_MODEL = 'deepseek-chat';
 
 // Anti-AI cliché filtering
@@ -219,13 +220,10 @@ REMEMBER: Avoid AI clichés (delve, pivotal, tapestry, realm, seamless, testamen
 export async function sendChatMessageToAI({
   messages,
   reportData,
-  apiKey = '',
+  apiKey = DEFAULT_DEEPSEEK_KEY,
   modelName = DEFAULT_MODEL
 }) {
-  const activeKey = apiKey?.trim() || '';
-  if (!activeKey) {
-    throw new Error('API Key inahitajika. Tafadhali bonyeza alama ya Settings (Mipangilio) uweke DeepSeek API Key yako.');
-  }
+  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_DEEPSEEK_KEY;
   const activeModel = modelName || DEFAULT_MODEL;
 
   const systemInstruction = buildMasterSystemPrompt(reportData);
@@ -301,7 +299,7 @@ export async function sendChatMessageToAI({
  * Generates a humanized, detailed technical activity paragraph for Chapter 2 practical tasks
  */
 export async function generateHumanizedActivityParagraph({
-  apiKey = '',
+  apiKey = DEFAULT_DEEPSEEK_KEY,
   modelName = DEFAULT_MODEL,
   department = {},
   level = 'degree',
@@ -312,10 +310,7 @@ export async function generateHumanizedActivityParagraph({
   specificDevice = '',
   challengeEncountered = ''
 }) {
-  const activeKey = apiKey?.trim() || '';
-  if (!activeKey) {
-    throw new Error('API Key inahitajika. Tafadhali weka DeepSeek API Key yako kwenye Settings.');
-  }
+  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_DEEPSEEK_KEY;
   const activeModel = modelName || DEFAULT_MODEL;
 
   const prompt = `You are a Senior Engineering Supervisor and Technical Assessor in Tanzania.
@@ -396,7 +391,7 @@ Return JSON in this format only:
  * Generates an exhaustive, multi-page, high-density Chapter 1 (Introduction & Company Overview)
  */
 export async function generateRichChapter1({
-  apiKey = '',
+  apiKey = DEFAULT_DEEPSEEK_KEY,
   modelName = DEFAULT_MODEL,
   universityId = 'dit',
   universityName = 'Dar es Salaam Institute of Technology (DIT)',
@@ -405,10 +400,7 @@ export async function generateRichChapter1({
   department = 'Computer Studies',
   industry = 'Engineering and Technology Operations'
 }) {
-  const activeKey = apiKey?.trim() || '';
-  if (!activeKey) {
-    throw new Error('API Key inahitajika. Tafadhali weka DeepSeek API Key yako kwenye Settings.');
-  }
+  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_DEEPSEEK_KEY;
   const activeModel = modelName || DEFAULT_MODEL;
 
   const prompt = `You are a Senior Technical Assessor and Industrial Practical Training Coordinator at ${universityName}.
@@ -546,7 +538,7 @@ RULES:
  * Generates an authoritative 5-day DIT IPT Weekly Logbook entry from brief/informal student notes
  */
 export async function generateWeeklyLogbookEntry({
-  apiKey = '',
+  apiKey = DEFAULT_DEEPSEEK_KEY,
   modelName = DEFAULT_MODEL,
   weekNumber = 1,
   briefInput = '',
@@ -555,10 +547,7 @@ export async function generateWeeklyLogbookEntry({
   level = 'degree',
   companyName = ''
 }) {
-  const activeKey = apiKey?.trim() || '';
-  if (!activeKey) {
-    throw new Error('API Key inahitajika. Tafadhali weka DeepSeek API Key yako kwenye Settings.');
-  }
+  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_DEEPSEEK_KEY;
   const activeModel = (modelName && modelName.toLowerCase().includes('reasoner')) ? modelName : 'deepseek-chat';
   const deptName = department?.name || 'Engineering';
   const firm = companyName || 'Host Firm';

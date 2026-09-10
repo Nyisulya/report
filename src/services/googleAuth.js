@@ -5,8 +5,8 @@
 const STORAGE_KEY = 'dit_google_user_v1';
 const CLIENT_ID_KEY = 'dit_google_client_id';
 
-// Google OAuth Client ID (must be configured via Settings or .env by user)
-export const DEFAULT_GOOGLE_CLIENT_ID = '';
+// Google OAuth Client ID for production
+export const DEFAULT_GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '911070223907-aqtkvj3ruuio20l3he5jbrc2ht7rbd1l.apps.googleusercontent.com';
 
 /**
  * Decodes Google JWT id_token without external dependencies
