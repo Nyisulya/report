@@ -62,11 +62,20 @@ export default function ChatView({
   onSyncGoogleProfile
 }) {
   const [messages, setMessages] = useState(() => {
-    const savedChat = localStorage.getItem('dit_chat_messages_v3');
+    const savedChat = localStorage.getItem('dit_chat_messages_v4') || localStorage.getItem('dit_chat_messages_v3');
     if (savedChat) {
       try {
         const parsed = JSON.parse(savedChat);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(msg => ({
+            ...msg,
+            text: typeof msg.text === 'string'
+              ? msg.text
+                  .replace(/\s*\((?:DeepSeek|deepseek)[^)]*\)/gi, '')
+                  .replace(/DeepSeek\s*(?:v4(?:\.1)?\s*Flash|v4|chat|reasoner)?/gi, 'AI Engine')
+              : msg.text
+          }));
+        }
       } catch (e) {
         console.error('Failed to parse saved chat:', e);
       }
@@ -113,7 +122,7 @@ export default function ChatView({
   // Persist chat history to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem('dit_chat_messages_v3', JSON.stringify(messages));
+      localStorage.setItem('dit_chat_messages_v4', JSON.stringify(messages));
     } catch (e) {
       console.warn('Failed to persist chat messages:', e);
     }
