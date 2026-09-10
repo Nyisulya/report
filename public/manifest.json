@@ -1,0 +1,20 @@
+{
+  "name": "Field Report AI - Technical Practical Training",
+  "short_name": "Report AI",
+  "description": "Mfumo rasmi wa AI wa kuandaa ripoti za Field (IPT) na Logbook kwa vyuo vikuu na taasisi za kiufundi.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#0f172a",
+  "orientation": "any",
+  "categories": ["education", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

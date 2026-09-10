@@ -7,6 +7,7 @@ import ProfileSetupModal from './components/ProfileSetupModal';
 import StructureModal from './components/StructureModal';
 import WeeklyLogbookModal from './components/WeeklyLogbookModal';
 import AdminDashboard from './components/AdminDashboard';
+import InstallAppPrompt from './components/InstallAppPrompt';
 import { INITIAL_REPORT_STATE } from './data/ditTemplates';
 import { UNIVERSITY_STRUCTURES, getUniversityStructure } from './data/universityStructures';
 import { exportDITReportToDocx } from './services/docxExporter';
@@ -610,6 +611,9 @@ export default function App() {
         apiKey={apiKey}
         activeModel={activeModel}
       />
+
+      {/* PWA Install App Prompt for Mobile and Desktop */}
+      <InstallAppPrompt />
     </div>
   );
 }
