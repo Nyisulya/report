@@ -31,7 +31,6 @@ function RealGoogleLoginButton({ onLoginSuccess, className }) {
     onSuccess: async (tokenResponse) => {
       setIsLoading(true);
       try {
-        // Fetch official user profile from Google UserInfo API
         const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: {
             Authorization: `Bearer ${tokenResponse.access_token}`
@@ -88,6 +87,72 @@ function RealGoogleLoginButton({ onLoginSuccess, className }) {
 
 export function GoogleSignInButton({ onLoginSuccess, className }) {
   const activeClientId = getGoogleClientId();
+  const [showConfig, setShowConfig] = useState(false);
+  const [inputVal, setInputVal] = useState('');
+
+  if (!activeClientId) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setShowConfig(true)}
+          className={className || "w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-full bg-white hover:bg-slate-100 text-slate-900 font-medium text-xs shadow-sm transition active:scale-98"}
+          title="Login with Google"
+        >
+          <GoogleIcon className="w-4 h-4" />
+          <span>Login with Google</span>
+        </button>
+
+        {showConfig && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-[#181818] border border-[#333333] rounded-2xl p-5 shadow-2xl space-y-4">
+              <div className="flex items-center space-x-2.5 pb-2 border-b border-[#282828]">
+                <div className="p-2 rounded-xl bg-white/10 text-white">
+                  <GoogleIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100">Google OAuth Client ID</h3>
+                  <p className="text-xs text-slate-400">Weka Google Client ID yako ili kuwezesha Sign-In</p>
+                </div>
+              </div>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (inputVal.trim()) {
+                  saveGoogleClientId(inputVal.trim());
+                  window.location.reload();
+                }
+              }} className="space-y-3 text-xs">
+                <input
+                  type="text"
+                  value={inputVal}
+                  onChange={(e) => setInputVal(e.target.value)}
+                  placeholder="k.m. 1234567890-xxx.apps.googleusercontent.com"
+                  className="w-full p-2.5 rounded-xl bg-[#111111] border border-[#383838] text-slate-100 text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none font-mono"
+                />
+                <div className="flex justify-end space-x-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowConfig(false)}
+                    className="px-3 py-1.5 rounded-xl bg-[#252525] hover:bg-[#303030] text-slate-300 font-semibold text-xs transition"
+                  >
+                    Funga
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition"
+                  >
+                    Hifadhi
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <GoogleOAuthProvider clientId={activeClientId}>
       <RealGoogleLoginButton onLoginSuccess={onLoginSuccess} className={className} />
@@ -224,13 +289,24 @@ export default function GoogleAuthButton({
     );
   }
 
-  // Not logged in: Render real Google OAuth Button wrapped in GoogleOAuthProvider
+  // Not logged in: Render real Google OAuth Button wrapped in GoogleOAuthProvider only if activeClientId is present
   return (
     <>
       <div className="flex items-center space-x-1.5">
-        <GoogleOAuthProvider clientId={activeClientId}>
-          <RealGoogleLoginButton onLoginSuccess={onLogin} />
-        </GoogleOAuthProvider>
+        {activeClientId ? (
+          <GoogleOAuthProvider clientId={activeClientId}>
+            <RealGoogleLoginButton onLoginSuccess={onLogin} />
+          </GoogleOAuthProvider>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowConfigModal(true)}
+            className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs flex items-center space-x-2 shadow-sm transition active:scale-95 border border-slate-200"
+          >
+            <GoogleIcon className="w-4 h-4" />
+            <span>Login with Google</span>
+          </button>
+        )}
 
         {/* Config button */}
         <button
