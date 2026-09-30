@@ -24,7 +24,14 @@ export function resolveActiveCredentials({ apiKey, modelName, baseUrl } = {}) {
     activeModel = DEFAULT_MODEL;
   }
 
-  const activeBaseUrl = (baseUrl || DEFAULT_HIVE_BASE_URL || '/api/hive').replace(/\/+$/, '');
+  // In browser environments, ALWAYS use the reverse proxy '/api/hive' to eliminate CORS preflight blocks
+  let activeBaseUrl = '/api/hive';
+  if (typeof window === 'undefined') {
+    activeBaseUrl = (baseUrl || DEFAULT_HIVE_BASE_URL || 'https://api-cdn.thehive.ai/api/v3').replace(/\/+$/, '');
+  } else if (baseUrl && !baseUrl.includes('api-cdn.thehive.ai')) {
+    activeBaseUrl = baseUrl.replace(/\/+$/, '');
+  }
+
   return { activeKey, activeModel, activeBaseUrl };
 }
 
