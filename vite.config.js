@@ -12,6 +12,13 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    allowedHosts: true
+    allowedHosts: true,
+    proxy: {
+      '/api/hive': {
+        target: 'https://api-cdn.thehive.ai/api/v3',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/hive/, '')
+      }
+    }
   }
 })

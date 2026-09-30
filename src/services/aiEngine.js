@@ -3,7 +3,7 @@ import { getUniversityStructure } from '../data/universityStructures.js';
 import { analyticsService } from './analyticsService.js';
 
 export const DEFAULT_HIVE_KEY = import.meta.env.VITE_HIVE_API_KEY || import.meta.env.VITE_DEEPSEEK_API_KEY || '';
-export const DEFAULT_HIVE_BASE_URL = import.meta.env.VITE_HIVE_BASE_URL || 'https://api-cdn.thehive.ai/api/v3';
+export const DEFAULT_HIVE_BASE_URL = import.meta.env.VITE_HIVE_BASE_URL || '/api/hive';
 export const DEFAULT_MODEL = import.meta.env.VITE_HIVE_MODEL || 'deepseek-ai/deepseek-v4.1-flash';
 
 // Backwards compatibility alias
