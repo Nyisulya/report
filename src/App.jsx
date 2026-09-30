@@ -138,14 +138,20 @@ export default function App() {
     return INITIAL_REPORT_STATE;
   });
 
-  // Settings State
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('hive_api_key') || localStorage.getItem('deepseek_api_key') || DEFAULT_HIVE_KEY);
+  // Settings State - auto-sanitize old cached keys/models
+  const [apiKey, setApiKey] = useState(() => {
+    const saved = localStorage.getItem('hive_api_key') || localStorage.getItem('deepseek_api_key');
+    if (saved && !saved.startsWith('sk-')) return saved;
+    localStorage.removeItem('deepseek_api_key');
+    return DEFAULT_HIVE_KEY;
+  });
   const [activeModel, setActiveModel] = useState(() => {
     const saved = localStorage.getItem('hive_model') || localStorage.getItem('deepseek_model');
-    if (!saved || saved === 'deepseek-flash' || saved.includes('chat') || saved.includes('reasoner')) {
-      return DEFAULT_MODEL;
+    if (saved && saved.startsWith('deepseek-ai/')) {
+      return saved;
     }
-    return saved;
+    localStorage.removeItem('deepseek_model');
+    return DEFAULT_MODEL;
   });
 
   // UI Drawer & Modal states

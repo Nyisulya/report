@@ -9,6 +9,25 @@ export const DEFAULT_MODEL = import.meta.env.VITE_HIVE_MODEL || 'deepseek-ai/dee
 // Backwards compatibility alias
 export const DEFAULT_DEEPSEEK_KEY = DEFAULT_HIVE_KEY;
 
+/**
+ * Sanitizes and resolves credentials, auto-migrating any old cached keys/models
+ */
+export function resolveActiveCredentials({ apiKey, modelName, baseUrl } = {}) {
+  let activeKey = (apiKey && typeof apiKey === 'string' && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_HIVE_KEY;
+  // If user has old sk- key from previous DeepSeek provider, fallback to environment Hive key
+  if (activeKey.startsWith('sk-') && DEFAULT_HIVE_KEY) {
+    activeKey = DEFAULT_HIVE_KEY;
+  }
+
+  let activeModel = modelName || DEFAULT_MODEL;
+  if (!activeModel || activeModel === 'deepseek-flash' || activeModel === 'deepseek-chat' || activeModel === 'deepseek-reasoner' || !activeModel.includes('/')) {
+    activeModel = DEFAULT_MODEL;
+  }
+
+  const activeBaseUrl = (baseUrl || DEFAULT_HIVE_BASE_URL || '/api/hive').replace(/\/+$/, '');
+  return { activeKey, activeModel, activeBaseUrl };
+}
+
 // Anti-AI cliché filtering
 export const BANNED_AI_WORDS = [
   'delve', 'delved', 'delving',
@@ -229,9 +248,7 @@ export async function sendChatMessageToAI({
   modelName = DEFAULT_MODEL,
   baseUrl = DEFAULT_HIVE_BASE_URL
 }) {
-  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_HIVE_KEY;
-  const activeModel = modelName || DEFAULT_MODEL;
-  const activeBaseUrl = (baseUrl || DEFAULT_HIVE_BASE_URL).replace(/\/+$/, '');
+  const { activeKey, activeModel, activeBaseUrl } = resolveActiveCredentials({ apiKey, modelName, baseUrl });
 
   const systemInstruction = buildMasterSystemPrompt(reportData);
 
@@ -337,9 +354,7 @@ export async function generateHumanizedActivityParagraph({
   specificDevice = '',
   challengeEncountered = ''
 }) {
-  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_HIVE_KEY;
-  const activeModel = modelName || DEFAULT_MODEL;
-  const activeBaseUrl = (baseUrl || DEFAULT_HIVE_BASE_URL).replace(/\/+$/, '');
+  const { activeKey, activeModel, activeBaseUrl } = resolveActiveCredentials({ apiKey, modelName, baseUrl });
 
   const prompt = `You are a Senior Engineering Supervisor and Technical Assessor in Tanzania.
 Write a rich, highly unique, authentic academic technical report paragraph (140-200 words) describing the practical task executed during Industrial Practical Training (IPT / PT).
@@ -429,9 +444,7 @@ export async function generateRichChapter1({
   department = 'Computer Studies',
   industry = 'Engineering and Technology Operations'
 }) {
-  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_HIVE_KEY;
-  const activeModel = modelName || DEFAULT_MODEL;
-  const activeBaseUrl = (baseUrl || DEFAULT_HIVE_BASE_URL).replace(/\/+$/, '');
+  const { activeKey, activeModel, activeBaseUrl } = resolveActiveCredentials({ apiKey, modelName, baseUrl });
 
   const prompt = `You are a Senior Technical Assessor and Industrial Practical Training Coordinator at ${universityName}.
 Write a comprehensive, authentic, multi-page CHAPTER 1 (INTRODUCTION & COMPANY OVERVIEW) for an engineering IPT report.
@@ -578,9 +591,7 @@ export async function generateWeeklyLogbookEntry({
   level = 'degree',
   companyName = ''
 }) {
-  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_HIVE_KEY;
-  const activeModel = modelName || DEFAULT_MODEL;
-  const activeBaseUrl = (baseUrl || DEFAULT_HIVE_BASE_URL).replace(/\/+$/, '');
+  const { activeKey, activeModel, activeBaseUrl } = resolveActiveCredentials({ apiKey, modelName, baseUrl });
   const deptName = department?.name || 'Engineering';
   const firm = companyName || 'Host Firm';
 
