@@ -3,7 +3,7 @@ import { X, Key, Cpu, Sparkles, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { getGoogleClientId, saveGoogleClientId } from '../services/googleAuth';
 import { GoogleIcon } from './GoogleAuthButton';
 
-export const EXCLUSIVE_MODEL = 'deepseek-flash';
+export const EXCLUSIVE_MODEL = 'deepseek-ai/deepseek-v4.1-flash';
 
 export default function SettingsModal({
   isOpen,
@@ -42,10 +42,10 @@ export default function SettingsModal({
             </div>
             <div>
               <h3 className="font-bold text-slate-100 text-base">
-                AI Engine & API Settings
+                Hive AI Engine & API Settings
               </h3>
               <p className="text-xs text-slate-400">
-                Usimamizi wa vigezo vya AI na API key kwa uandishi sahihi wa ripoti za kihandisi.
+                Usimamizi wa vigezo vya Hive AI na API key kwa uandishi sahihi wa ripoti za kihandisi.
               </p>
             </div>
           </div>
@@ -64,7 +64,7 @@ export default function SettingsModal({
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 flex items-center justify-between">
               <span className="flex items-center space-x-1.5">
                 <Key className="w-3.5 h-3.5 text-amber-400" />
-                <span>AI Engine API Key</span>
+                <span>Hive AI Engine API Key</span>
               </span>
               <span className="text-[11px] font-mono text-emerald-400">
                 Active Key Loaded
@@ -75,12 +75,12 @@ export default function SettingsModal({
                 type="text"
                 value={tempKey}
                 onChange={(e) => setTempKey(e.target.value)}
-                placeholder="sk-..."
+                placeholder="Weka Hive API Key hapa au acha isomwe kutoka .env"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f0f0f] border border-[#333333] text-slate-100 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-500 transition"
               />
             </div>
             <p className="text-[11px] text-slate-400 mt-1.5">
-              Ingiza API key yako hapa au weka kwenye faili la .env kwenye server.
+              Ingiza Hive API key yako hapa au weka kwenye faili la .env.
             </p>
           </div>
 
@@ -113,14 +113,14 @@ export default function SettingsModal({
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2 flex items-center space-x-1.5">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Model ya AI Inayotumika (Exclusive AI Engine)</span>
+              <span>Model ya AI Inayotumika (Hive AI Engine)</span>
             </label>
             
             <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/40 ring-1 ring-amber-500/20 space-y-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <span className="font-bold text-xs text-amber-300">
-                    Flash Engine (v4.1 High Precision)
+                    Hive AI (DeepSeek v4.1 Flash)
                   </span>
                   <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-semibold font-mono">
                     1M Context
@@ -131,7 +131,7 @@ export default function SettingsModal({
                 </span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Injini ya kiwango cha juu yenye 1M Context Window, 64K Max Output, na uwezo wa uchambuzi wa kiufundi kwa ajili ya kuandaa ripoti rasmi.
+                Injini ya Hive AI yenye DeepSeek v4.1 Flash, 1M Context Window, na uwezo mkubwa wa uchambuzi wa kiufundi kwa ajili ya kuandaa ripoti rasmi.
               </p>
             </div>
           </div>

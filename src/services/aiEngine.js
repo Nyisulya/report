@@ -2,8 +2,12 @@ import { getVivaTipForActivity } from '../data/vivaQuestions.js';
 import { getUniversityStructure } from '../data/universityStructures.js';
 import { analyticsService } from './analyticsService.js';
 
-export const DEFAULT_DEEPSEEK_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY || '';
-export const DEFAULT_MODEL = 'deepseek-flash';
+export const DEFAULT_HIVE_KEY = import.meta.env.VITE_HIVE_API_KEY || import.meta.env.VITE_DEEPSEEK_API_KEY || '';
+export const DEFAULT_HIVE_BASE_URL = import.meta.env.VITE_HIVE_BASE_URL || 'https://api-cdn.thehive.ai/api/v3';
+export const DEFAULT_MODEL = import.meta.env.VITE_HIVE_MODEL || 'deepseek-ai/deepseek-v4.1-flash';
+
+// Backwards compatibility alias
+export const DEFAULT_DEEPSEEK_KEY = DEFAULT_HIVE_KEY;
 
 // Anti-AI cliché filtering
 export const BANNED_AI_WORDS = [
@@ -216,16 +220,18 @@ REMEMBER: Avoid AI clichés (delve, pivotal, tapestry, realm, seamless, testamen
 }
 
 /**
- * Calls DeepSeek v4 Flash directly with conversation history and document context
+ * Calls Hive AI (DeepSeek v4.1 Flash) directly with conversation history and document context
  */
 export async function sendChatMessageToAI({
   messages,
   reportData,
-  apiKey = DEFAULT_DEEPSEEK_KEY,
-  modelName = DEFAULT_MODEL
+  apiKey = DEFAULT_HIVE_KEY,
+  modelName = DEFAULT_MODEL,
+  baseUrl = DEFAULT_HIVE_BASE_URL
 }) {
-  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_DEEPSEEK_KEY;
+  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_HIVE_KEY;
   const activeModel = modelName || DEFAULT_MODEL;
+  const activeBaseUrl = (baseUrl || DEFAULT_HIVE_BASE_URL).replace(/\/+$/, '');
 
   const systemInstruction = buildMasterSystemPrompt(reportData);
 
@@ -237,7 +243,7 @@ export async function sendChatMessageToAI({
     }))
   ];
 
-  const endpoint = 'https://api.deepseek.com/chat/completions';
+  const endpoint = `${activeBaseUrl}/chat/completions`;
 
   try {
     const res = await fetch(endpoint, {
@@ -319,8 +325,9 @@ export async function sendChatMessageToAI({
  * Generates a humanized, detailed technical activity paragraph for Chapter 2 practical tasks
  */
 export async function generateHumanizedActivityParagraph({
-  apiKey = DEFAULT_DEEPSEEK_KEY,
+  apiKey = DEFAULT_HIVE_KEY,
   modelName = DEFAULT_MODEL,
+  baseUrl = DEFAULT_HIVE_BASE_URL,
   department = {},
   level = 'degree',
   companyName = '',
@@ -330,8 +337,9 @@ export async function generateHumanizedActivityParagraph({
   specificDevice = '',
   challengeEncountered = ''
 }) {
-  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_DEEPSEEK_KEY;
+  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_HIVE_KEY;
   const activeModel = modelName || DEFAULT_MODEL;
+  const activeBaseUrl = (baseUrl || DEFAULT_HIVE_BASE_URL).replace(/\/+$/, '');
 
   const prompt = `You are a Senior Engineering Supervisor and Technical Assessor in Tanzania.
 Write a rich, highly unique, authentic academic technical report paragraph (140-200 words) describing the practical task executed during Industrial Practical Training (IPT / PT).
@@ -364,7 +372,7 @@ Return JSON in this format only:
 \`\`\``;
 
   try {
-    const res = await fetch('https://api.deepseek.com/chat/completions', {
+    const res = await fetch(`${activeBaseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -411,8 +419,9 @@ Return JSON in this format only:
  * Generates an exhaustive, multi-page, high-density Chapter 1 (Introduction & Company Overview)
  */
 export async function generateRichChapter1({
-  apiKey = DEFAULT_DEEPSEEK_KEY,
+  apiKey = DEFAULT_HIVE_KEY,
   modelName = DEFAULT_MODEL,
+  baseUrl = DEFAULT_HIVE_BASE_URL,
   universityId = 'dit',
   universityName = 'Dar es Salaam Institute of Technology (DIT)',
   companyName = '',
@@ -420,8 +429,9 @@ export async function generateRichChapter1({
   department = 'Computer Studies',
   industry = 'Engineering and Technology Operations'
 }) {
-  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_DEEPSEEK_KEY;
+  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_HIVE_KEY;
   const activeModel = modelName || DEFAULT_MODEL;
+  const activeBaseUrl = (baseUrl || DEFAULT_HIVE_BASE_URL).replace(/\/+$/, '');
 
   const prompt = `You are a Senior Technical Assessor and Industrial Practical Training Coordinator at ${universityName}.
 Write a comprehensive, authentic, multi-page CHAPTER 1 (INTRODUCTION & COMPANY OVERVIEW) for an engineering IPT report.
@@ -488,7 +498,7 @@ RULES:
 \`\`\``;
 
   try {
-    const res = await fetch('https://api.deepseek.com/chat/completions', {
+    const res = await fetch(`${activeBaseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -558,8 +568,9 @@ RULES:
  * Generates an authoritative 5-day DIT IPT Weekly Logbook entry from brief/informal student notes
  */
 export async function generateWeeklyLogbookEntry({
-  apiKey = DEFAULT_DEEPSEEK_KEY,
+  apiKey = DEFAULT_HIVE_KEY,
   modelName = DEFAULT_MODEL,
+  baseUrl = DEFAULT_HIVE_BASE_URL,
   weekNumber = 1,
   briefInput = '',
   dailyInputs = null,
@@ -567,8 +578,9 @@ export async function generateWeeklyLogbookEntry({
   level = 'degree',
   companyName = ''
 }) {
-  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_DEEPSEEK_KEY;
+  const activeKey = (apiKey && apiKey.trim().length > 5) ? apiKey.trim() : DEFAULT_HIVE_KEY;
   const activeModel = modelName || DEFAULT_MODEL;
+  const activeBaseUrl = (baseUrl || DEFAULT_HIVE_BASE_URL).replace(/\/+$/, '');
   const deptName = department?.name || 'Engineering';
   const firm = companyName || 'Host Firm';
 
@@ -760,7 +772,7 @@ CRITICAL INSTRUCTIONS FOR AUTHENTICITY, VARIETY & FLEXIBILITY:
 
 
   try {
-    const res = await fetch('https://api.deepseek.com/chat/completions', {
+    const res = await fetch(`${activeBaseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

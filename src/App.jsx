@@ -14,6 +14,7 @@ import { exportDITReportToDocx } from './services/docxExporter';
 import { synchronizeReport } from './services/reportSynchronizer';
 import { getStoredGoogleUser, saveGoogleUser, removeGoogleUser } from './services/googleAuth';
 import { analyticsService } from './services/analyticsService';
+import { DEFAULT_HIVE_KEY, DEFAULT_MODEL } from './services/aiEngine';
 
 export default function App() {
   // Google Authentication State
@@ -138,11 +139,11 @@ export default function App() {
   });
 
   // Settings State
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('deepseek_api_key') || '');
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('hive_api_key') || localStorage.getItem('deepseek_api_key') || DEFAULT_HIVE_KEY);
   const [activeModel, setActiveModel] = useState(() => {
-    const saved = localStorage.getItem('deepseek_model');
-    if (!saved || saved.includes('v4.1-flash') || saved.includes('chat') || saved.includes('reasoner')) {
-      return 'deepseek-flash';
+    const saved = localStorage.getItem('hive_model') || localStorage.getItem('deepseek_model');
+    if (!saved || saved === 'deepseek-flash' || saved.includes('chat') || saved.includes('reasoner')) {
+      return DEFAULT_MODEL;
     }
     return saved;
   });
@@ -213,11 +214,13 @@ export default function App() {
 
   const handleSaveApiKey = (key) => {
     setApiKey(key);
+    localStorage.setItem('hive_api_key', key);
     localStorage.setItem('deepseek_api_key', key);
   };
 
   const handleSelectModel = (model) => {
     setActiveModel(model);
+    localStorage.setItem('hive_model', model);
     localStorage.setItem('deepseek_model', model);
   };
 

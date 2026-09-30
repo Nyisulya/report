@@ -182,9 +182,9 @@ class AnalyticsService {
       userName: studentName || user?.name || 'Mwanafunzi',
       university: university || user?.university || 'DIT',
       title: 'AI Report Content Generated',
-      description: `Generated ~${wordCount.toLocaleString()} words using ${modelName || 'deepseek-flash'} (${tokens.toLocaleString()} tokens)`,
+      description: `Generated ~${wordCount.toLocaleString()} words using ${modelName || 'deepseek-ai/deepseek-v4.1-flash'} (${tokens.toLocaleString()} tokens)`,
       tokens,
-      badge: modelName || 'deepseek-flash'
+      badge: modelName || 'deepseek-ai/deepseek-v4.1-flash'
     });
   }
 
