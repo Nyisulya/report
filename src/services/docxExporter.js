@@ -19,7 +19,7 @@ import {
   ImageRun
 } from 'docx';
 import { saveAs } from 'file-saver';
-import { buildDynamicTableOfContents, buildDynamicTableOfFigures } from './reportSynchronizer.js';
+import { buildDynamicTableOfContents, buildDynamicTableOfFigures, cleanFigureCaption } from './reportSynchronizer.js';
 import { analyticsService } from './analyticsService.js';
 
 export async function exportDITReportToDocx(reportData) {
@@ -722,14 +722,18 @@ function buildChaptersParagraphs(chapters = [], metadata = {}) {
         }
       }
 
-      if (sec.imageCaption || sec.image) {
+      if (sec.image) {
+        const figEntry = dynamicFigures.find(f => f.sectionId === sec.id);
+        const figNo = figEntry ? figEntry.figureNo : `Figure ${chap.number}.${secIdx + 1}`;
+        const figCaption = cleanFigureCaption(sec.imageCaption, sec.title);
+
         elements.push(
           new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { before: 60, after: 160 },
             children: [
               new TextRun({
-                text: `Figure ${chap.number}.${secIdx + 1}: ${sec.imageCaption || `${sec.title} Demonstration / Setup`}`,
+                text: `${figNo}: ${figCaption}`,
                 italics: true,
                 bold: true,
                 size: 22,

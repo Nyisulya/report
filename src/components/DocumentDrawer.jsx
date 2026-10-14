@@ -11,7 +11,7 @@ import {
   ChevronRight,
   Image as ImageIcon
 } from 'lucide-react';
-import { buildDynamicTableOfContents, buildDynamicTableOfFigures } from '../services/reportSynchronizer.js';
+import { buildDynamicTableOfContents, buildDynamicTableOfFigures, cleanFigureCaption } from '../services/reportSynchronizer.js';
 import { compressImageFile } from '../services/imageCompressor.js';
 
 export default function DocumentDrawer({
@@ -42,9 +42,15 @@ export default function DocumentDrawer({
     try {
       const compressedDataUrl = await compressImageFile(file, 900, 900, 0.75);
       if (compressedDataUrl) {
+        const chap = chapters?.find(c => c.id === chapterId);
+        const currentSec = chap?.sections?.find(s => s.id === sectionId);
+        const defaultCaption = currentSec?.title
+          ? `${currentSec.title} - Setup and Execution`
+          : 'Technical Implementation Setup';
+
         onUpdateSection(chapterId, sectionId, {
           image: compressedDataUrl,
-          imageCaption: `Setup and execution of ${file.name.replace(/\.[^/.]+$/, "")}`
+          imageCaption: defaultCaption
         });
       }
     } catch (err) {
@@ -401,32 +407,38 @@ export default function DocumentDrawer({
                               />
 
                               {/* Attached Image Preview */}
-                              {sec.image && (
-                                <div className="my-3 p-3 rounded-xl bg-slate-100 border border-slate-300 text-center relative group/img shadow-sm">
-                                  <img
-                                    src={sec.image}
-                                    alt={sec.imageCaption || sec.title}
-                                    className="max-h-72 mx-auto rounded-lg object-contain shadow-sm bg-white p-1"
-                                  />
-                                  <div className="mt-2 flex items-center justify-center space-x-2 text-[11px] font-bold text-slate-800">
-                                    <span>Figure {currentChap.number}.{secIdx + 1}:</span>
-                                    <input
-                                      type="text"
-                                      value={sec.imageCaption || `${sec.title}`}
-                                      onChange={(e) => onUpdateSection(currentChap.id, sec.id, { imageCaption: e.target.value })}
-                                      className="bg-transparent border-b border-dashed border-slate-400 px-2 py-0.5 text-[11px] text-center focus:outline-none focus:border-amber-500 max-w-sm"
-                                      placeholder="Andika maelezo ya picha (Caption)..."
+                              {sec.image && (() => {
+                                const figEntry = dynamicFigures.find(f => f.sectionId === sec.id);
+                                const figLabel = figEntry ? figEntry.figureNo : `Figure ${currentChap.number}.${secIdx + 1}`;
+                                const displayCaption = cleanFigureCaption(sec.imageCaption, sec.title);
+
+                                return (
+                                  <div className="my-3 p-3 rounded-xl bg-slate-100 border border-slate-300 text-center relative group/img shadow-sm">
+                                    <img
+                                      src={sec.image}
+                                      alt={displayCaption}
+                                      className="max-h-72 mx-auto rounded-lg object-contain shadow-sm bg-white p-1"
                                     />
+                                    <div className="mt-2 flex items-center justify-center space-x-2 text-[11px] font-bold text-slate-800">
+                                      <span className="shrink-0">{figLabel}:</span>
+                                      <input
+                                        type="text"
+                                        value={displayCaption}
+                                        onChange={(e) => onUpdateSection(currentChap.id, sec.id, { imageCaption: e.target.value })}
+                                        className="bg-transparent border-b border-dashed border-slate-400 px-2 py-0.5 text-[11px] text-center focus:outline-none focus:border-amber-500 w-full max-w-sm font-academic"
+                                        placeholder="Andika maelezo ya picha (Caption)..."
+                                      />
+                                    </div>
+                                    <button
+                                      onClick={() => onUpdateSection(currentChap.id, sec.id, { image: null, imageCaption: null })}
+                                      className="absolute top-2 right-2 p-1 rounded bg-red-600 hover:bg-red-700 text-white shadow cursor-pointer"
+                                      title="Ondoa picha"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
                                   </div>
-                                  <button
-                                    onClick={() => onUpdateSection(currentChap.id, sec.id, { image: null, imageCaption: null })}
-                                    className="absolute top-2 right-2 p-1 rounded bg-red-600 hover:bg-red-700 text-white shadow cursor-pointer"
-                                    title="Ondoa picha"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              )}
+                                );
+                              })()}
 
                               {sec.vivaTip && (
                                 <div className="mt-2 p-2 bg-amber-50 rounded border border-amber-200 text-[11px] text-amber-900 flex items-start space-x-1.5">

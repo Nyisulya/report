@@ -422,22 +422,81 @@ export function buildDynamicTableOfContents(reportData) {
 }
 
 /**
- * Dynamically builds Table of Figures (including attached task photos and technical setup diagrams)
+ * Cleans figure captions, replacing generic camera/phone filenames (e.g. 1000..., IMG_..., etc.)
+ * with professional contextual academic captions based on the task/section title.
+ */
+export function cleanFigureCaption(caption, sectionTitle = '') {
+  const fallback = sectionTitle ? `${sectionTitle} - Implementation and Setup` : 'Technical Implementation Setup';
+  if (!caption || typeof caption !== 'string') return fallback;
+  const trimmed = caption.trim();
+
+  // If caption is raw phone camera name or "Setup and execution of 1000..."
+  if (/^setup and execution of (1000\d*|img[-_]?\d*|pxl[-_]?\d*|image\d*|dsc[-_]?\d*|\d{4,})/i.test(trimmed)) {
+    return fallback;
+  }
+  if (/^(1000\d{3,}|img[-_]?\d{3,}|pxl[-_]?\d{3,}|image\d{3,}|dsc[-_]?\d{3,}|\d{6,})/i.test(trimmed)) {
+    return fallback;
+  }
+  return trimmed;
+}
+
+/**
+ * Dynamically builds Table of Figures across all chapters based on uploaded photos and diagrams
  */
 export function buildDynamicTableOfFigures(reportData) {
   const figures = [];
-  const chap2 = reportData.chapters?.find(c => c.id === 'chap2');
-  
-  if (chap2 && chap2.sections) {
-    const tasks = chap2.sections.filter(s => (s.code.startsWith('2.2') || s.code.startsWith('2.')) && (s.content || '').trim().length > 0);
-    tasks.forEach((t, idx) => {
-      figures.push({
-        figureNo: `Figure 2.${idx + 1}`,
-        title: t.imageCaption || `${t.title} Execution and Testing Setup`,
-        hasImage: !!t.image,
-        page: Math.max(4, 4 + idx)
-      });
+  if (!reportData?.chapters) return figures;
+
+  let estimatedPage = 1;
+  const chapterPages = {};
+
+  // First estimate start page for each chapter based on text lengths
+  reportData.chapters.forEach((chap) => {
+    chapterPages[chap.id] = estimatedPage;
+    let words = 0;
+    (chap.sections || []).forEach(s => {
+      words += (s.content || '').split(/\s+/).length;
     });
+    estimatedPage += Math.max(1, Math.ceil(words / 320));
+  });
+
+  // Collect all sections across all chapters that have an uploaded image
+  reportData.chapters.forEach((chap) => {
+    let figIdxInChapter = 0;
+    (chap.sections || []).forEach((sec, sIdx) => {
+      if (sec.image) {
+        figIdxInChapter++;
+        const figNo = `Figure ${chap.number || 2}.${figIdxInChapter}`;
+        const title = cleanFigureCaption(sec.imageCaption, sec.title);
+        const page = (chapterPages[chap.id] || 4) + Math.min(3, Math.floor(sIdx / 2));
+        figures.push({
+          figureNo: figNo,
+          title: title,
+          hasImage: true,
+          chapterId: chap.id,
+          sectionId: sec.id,
+          page: Math.max(1, page)
+        });
+      }
+    });
+  });
+
+  // Fallback: If the user hasn't uploaded any images yet, list planned figures from Chapter 2 tasks
+  if (figures.length === 0) {
+    const chap2 = reportData.chapters?.find(c => c.id === 'chap2');
+    if (chap2 && chap2.sections) {
+      const activeTasks = chap2.sections.filter(s => (s.content || '').trim().length > 0);
+      activeTasks.forEach((t, idx) => {
+        figures.push({
+          figureNo: `Figure 2.${idx + 1}`,
+          title: cleanFigureCaption(t.imageCaption, t.title),
+          hasImage: false,
+          chapterId: chap2.id,
+          sectionId: t.id,
+          page: Math.max(4, 4 + idx)
+        });
+      });
+    }
   }
 
   return figures;
