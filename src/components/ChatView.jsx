@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sendChatMessageToAI, DEFAULT_MODEL } from '../services/aiEngine.js';
-import { autoExtractCoverMetadata } from '../services/reportSynchronizer.js';
+import { autoExtractCoverMetadata, extractAbbreviationsFromReport } from '../services/reportSynchronizer.js';
 import GoogleAuthButton from './GoogleAuthButton.jsx';
 import { analyticsService } from '../services/analyticsService.js';
 
@@ -188,7 +188,17 @@ export default function ChatView({
 
         if (ad.preliminaries && onUpdatePreliminaries) {
           Object.entries(ad.preliminaries).forEach(([field, val]) => {
-            if (val) onUpdatePreliminaries(field, val);
+            if (val) {
+              if (field === 'abbreviations' && Array.isArray(val)) {
+                const normalized = val.map(item => ({
+                  term: item.term || item.abbr || item.acronym || '',
+                  definition: item.definition || item.meaning || item.desc || ''
+                })).filter(i => i.term && i.definition);
+                onUpdatePreliminaries('abbreviations', normalized);
+              } else {
+                onUpdatePreliminaries(field, val);
+              }
+            }
           });
         }
 
@@ -199,6 +209,22 @@ export default function ChatView({
             onUpdateChapterSections(chapId, secs);
             confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
             onSelectChapter(chapId);
+
+            // If Chapter 5 just completed, auto-harvest all abbreviations across Chapters 1-5
+            if (chapId === 'chap5' && onUpdatePreliminaries) {
+              try {
+                const mockUpdatedReport = {
+                  ...reportData,
+                  chapters: (reportData?.chapters || []).map(c => c.id === 'chap5' ? { ...c, sections: secs } : c)
+                };
+                const harvested = extractAbbreviationsFromReport(mockUpdatedReport);
+                if (harvested && harvested.length > 0) {
+                  onUpdatePreliminaries('abbreviations', harvested);
+                }
+              } catch (e) {
+                console.warn('Auto abbreviations harvest error:', e);
+              }
+            }
           }
         }
 

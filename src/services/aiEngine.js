@@ -51,24 +51,27 @@ export function safeParseJSON(input) {
   const codeMatch = text.match(/```(?:json_action|json)?\s*([\s\S]*?)\s*```/i);
   if (codeMatch) {
     text = codeMatch[1].trim();
+  } else {
+    // If opening backticks exist without closing backticks (truncated response)
+    const openMatch = text.match(/```(?:json_action|json)?\s*([\s\S]*)$/i);
+    if (openMatch) {
+      text = openMatch[1].trim();
+    }
   }
 
-  // 2. Isolate outermost JSON object or array
+  // 2. Isolate outermost JSON object or array starting at first { or [
   const firstBrace = text.indexOf('{');
   const firstBracket = text.indexOf('[');
   let startIdx = -1;
-  let endIdx = -1;
 
   if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
     startIdx = firstBrace;
-    endIdx = text.lastIndexOf('}');
   } else if (firstBracket !== -1) {
     startIdx = firstBracket;
-    endIdx = text.lastIndexOf(']');
   }
 
-  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-    text = text.substring(startIdx, endIdx + 1);
+  if (startIdx !== -1) {
+    text = text.substring(startIdx);
   }
 
   // 3. Direct JSON.parse
@@ -78,7 +81,7 @@ export function safeParseJSON(input) {
     // Continue
   }
 
-  // 4. jsonrepair directly
+  // 4. jsonrepair directly on full text (handles truncated strings, unclosed brackets, missing braces)
   try {
     const repaired = jsonrepair(text);
     return JSON.parse(repaired);
@@ -86,7 +89,21 @@ export function safeParseJSON(input) {
     // Continue
   }
 
-  // 5. Clean control characters and try jsonrepair
+  // 5. If text had trailing unclosed characters, try trimming back to last closing quote/brace and repairing
+  const lastBrace = text.lastIndexOf('}');
+  const lastBracket = text.lastIndexOf(']');
+  const endIdx = Math.max(lastBrace, lastBracket);
+  if (endIdx > 0) {
+    try {
+      const sliced = text.substring(0, endIdx + 1);
+      const repaired = jsonrepair(sliced);
+      return JSON.parse(repaired);
+    } catch (e2b) {
+      // Continue
+    }
+  }
+
+  // 6. Clean control characters and try jsonrepair
   try {
     const sanitized = sanitizeRawJSON(text);
     const repaired = jsonrepair(sanitized);
@@ -95,7 +112,7 @@ export function safeParseJSON(input) {
     // Continue
   }
 
-  // 6. Fix internal unescaped double quotes e.g. "key": "Value "quoted" inside"
+  // 7. Fix internal unescaped double quotes e.g. "key": "Value "quoted" inside"
   try {
     const cleanedQuotes = text.replace(/([a-zA-Z0-9_\s])"([a-zA-Z0-9_\s]+)"([a-zA-Z0-9_\s])/g, "$1'$2'$3");
     const repaired = jsonrepair(cleanedQuotes);
@@ -364,8 +381,15 @@ function buildMasterSystemPrompt(reportData) {
    • STEP 6: CHAPTER 5 INTERVIEW (CONCLUSIONS & RECOMMENDATIONS):
      - Ask ONLY: "Chapter 5: Ushauri gani unatoa kwa chuo chako (${uniShort}) na ushauri gani kwa Kampuni/Host Firm?"
      - Once answered: Generate full Chapter 5 in json_action (action: "update_chapter", chapterId: "chap5").
-     - Execute THE SMART COMPILE (harvest abbreviations and generate abstract in preliminaries).
-     - Congratulate the student! The entire report is now 100% complete and ready for download as Word (.docx) or PDF!
+       Must include all 4 official sections:
+         • 5.1 Conclusion
+         • 5.2 Recommendations
+         • 5.2.1 Recommendations to Institute (${uniShort})
+         • 5.2.2 Recommendations to Organisation (Firm)
+       In preliminaries, generate:
+         • "abstract": Dense academic executive summary paragraph (150-250 words) synthesizing host firm background, duties performed, skills gained, and overall IPT impact.
+       (Note: Do NOT dump huge manual lists of abbreviations in Chapter 5 JSON because the system automatically harvests and compiles all technical abbreviations across Chapters 1 to 5 dynamically).
+     - In chat, warmly congratulate the student: "Hongera sana! Ripoti yako yote ya IPT imekamilika 100% kuanzia Jalada, Sura ya 1 hadi 5, na kurasa za awali! Sasa iko tayari kupakuliwa kama Word (.docx) au PDF!"
 `;
 
   return `You are the ${roleTitle}.
@@ -507,7 +531,7 @@ export async function sendChatMessageToAI({
         model: activeModel,
         messages: formattedMessages,
         temperature: 0.4,
-        max_tokens: 6000,
+        max_tokens: 8000,
         stream: false
       })
     });
@@ -520,21 +544,38 @@ export async function sendChatMessageToAI({
     const data = await res.json();
     const rawContent = data?.choices?.[0]?.message?.content?.trim() || '';
 
-    // Parse action block (supports json_action or json)
+    // Parse action block (supports json_action or json, closed or unclosed)
     let cleanText = rawContent;
     let actionData = null;
     let chips = [];
+    let jsonBlockContent = null;
 
-    const actionMatch = rawContent.match(/```(?:json_action|json)\s*([\s\S]*?)\s*```/i);
-    if (actionMatch) {
+    const closedMatch = rawContent.match(/```(?:json_action|json)?\s*([\s\S]*?)\s*```/i);
+    if (closedMatch) {
+      jsonBlockContent = closedMatch[1].trim();
+      cleanText = rawContent.replace(/```(?:json_action|json)?\s*[\s\S]*?\s*```/i, '').trim();
+    } else {
+      const openMatch = rawContent.match(/```(?:json_action|json)?\s*([\s\S]*)$/i);
+      if (openMatch) {
+        jsonBlockContent = openMatch[1].trim();
+        cleanText = rawContent.replace(/```(?:json_action|json)?\s*[\s\S]*$/i, '').trim();
+      } else {
+        const bareIdx = rawContent.indexOf('{"action"');
+        if (bareIdx !== -1) {
+          jsonBlockContent = rawContent.substring(bareIdx).trim();
+          cleanText = rawContent.substring(0, bareIdx).trim();
+        }
+      }
+    }
+
+    if (jsonBlockContent) {
       try {
-        const parsed = safeParseJSON(actionMatch[1]);
-        if (parsed && typeof parsed === 'object' && (parsed.action || parsed.metadata || parsed.task || parsed.sections || parsed.preliminaries || parsed.chips)) {
+        const parsed = safeParseJSON(jsonBlockContent);
+        if (parsed && typeof parsed === 'object') {
           actionData = parsed;
           if (actionData.chips && Array.isArray(actionData.chips)) {
             chips = actionData.chips;
           }
-          cleanText = rawContent.replace(/```(?:json_action|json)\s*[\s\S]*?\s*```/i, '').trim();
         }
       } catch (e) {
         console.warn('Failed to parse action JSON block:', e);
