@@ -19,8 +19,8 @@ import {
   ImageRun
 } from 'docx';
 import { saveAs } from 'file-saver';
-import { buildDynamicTableOfContents, buildDynamicTableOfFigures } from './reportSynchronizer';
-import { analyticsService } from './analyticsService';
+import { buildDynamicTableOfContents, buildDynamicTableOfFigures } from './reportSynchronizer.js';
+import { analyticsService } from './analyticsService.js';
 
 export async function exportDITReportToDocx(reportData) {
   const { metadata = {}, preliminaries = {}, chapters = [] } = reportData || {};
@@ -127,11 +127,7 @@ export async function exportDITReportToDocx(reportData) {
             children: [
               new Paragraph({
                 alignment: AlignmentType.CENTER,
-                children: [
-                  new TextRun({
-                    children: [PageNumber.CURRENT]
-                  })
-                ]
+                children: [PageNumber.CURRENT]
               })
             ]
           })
@@ -155,7 +151,7 @@ export async function exportDITReportToDocx(reportData) {
           }),
 
           // ii. ACKNOWLEDGEMENT
-          new PageBreak(),
+          new Paragraph({ children: [new PageBreak()] }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
             heading: HeadingLevel.HEADING_1,
@@ -173,7 +169,7 @@ export async function exportDITReportToDocx(reportData) {
           }),
 
           // iii. DECLARATION
-          new PageBreak(),
+          new Paragraph({ children: [new PageBreak()] }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
             heading: HeadingLevel.HEADING_1,
@@ -201,7 +197,7 @@ export async function exportDITReportToDocx(reportData) {
           }),
 
           // iv. LIST OF ABBREVIATIONS
-          new PageBreak(),
+          new Paragraph({ children: [new PageBreak()] }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
             heading: HeadingLevel.HEADING_1,
@@ -211,7 +207,7 @@ export async function exportDITReportToDocx(reportData) {
           buildAbbreviationsTable(preliminaries.abbreviations, uniAcronym, uniName),
 
           // v. TABLE OF FIGURES
-          new PageBreak(),
+          new Paragraph({ children: [new PageBreak()] }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
             heading: HeadingLevel.HEADING_1,
@@ -221,7 +217,7 @@ export async function exportDITReportToDocx(reportData) {
           buildTableOfFiguresTable(dynamicFigures),
 
           // vi. TABLE OF CONTENTS
-          new PageBreak(),
+          new Paragraph({ children: [new PageBreak()] }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
             heading: HeadingLevel.HEADING_1,
@@ -270,11 +266,7 @@ export async function exportDITReportToDocx(reportData) {
             children: [
               new Paragraph({
                 alignment: AlignmentType.CENTER,
-                children: [
-                  new TextRun({
-                    children: [PageNumber.CURRENT]
-                  })
-                ]
+                children: [PageNumber.CURRENT]
               })
             ]
           })
@@ -284,10 +276,28 @@ export async function exportDITReportToDocx(reportData) {
     ]
   });
 
-  const blob = await Packer.toBlob(doc);
+  const rawBlob = await Packer.toBlob(doc);
+  const docxBlob = new Blob([rawBlob], {
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  });
   const cleanStudent = (metadata.studentName || 'Student').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
   const cleanFilename = `${uniAcronym}_Report_${cleanStudent}.docx`;
-  saveAs(blob, cleanFilename);
+
+  if (typeof window !== 'undefined') {
+    const url = window.URL.createObjectURL(docxBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = cleanFilename;
+    link.setAttribute('download', cleanFilename);
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    }, 1500);
+  } else {
+    saveAs(docxBlob, cleanFilename);
+  }
 
   // Record analytics telemetry
   try {
@@ -618,7 +628,7 @@ function buildChaptersParagraphs(chapters = [], metadata = {}) {
 
   chapters.forEach((chap, idx) => {
     if (idx > 0) {
-      elements.push(new PageBreak());
+      elements.push(new Paragraph({ children: [new PageBreak()] }));
     }
 
     // Chapter Header
@@ -648,7 +658,7 @@ function buildChaptersParagraphs(chapters = [], metadata = {}) {
     );
 
     // Chapter Sections
-    (chap.sections || []).forEach(sec => {
+    (chap.sections || []).forEach((sec, secIdx) => {
       elements.push(
         new Paragraph({
           alignment: AlignmentType.LEFT,
@@ -734,7 +744,7 @@ function buildChaptersParagraphs(chapters = [], metadata = {}) {
 
   // References Section
   elements.push(
-    new PageBreak(),
+    new Paragraph({ children: [new PageBreak()] }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { before: 180, after: 360 },
