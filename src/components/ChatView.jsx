@@ -166,6 +166,14 @@ export default function ChatView({
       onSaveMetadata(currentMetadata);
     }
 
+    // Auto-sync logbooks to report if user mentions logbook or asks to pull
+    if (reportData?.logbooks?.length > 0 && /log\s*book|nishajaza|nilijaza|vuta/i.test(text)) {
+      if (onSyncAllLogbooks) {
+        onSyncAllLogbooks(reportData.logbooks);
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+      }
+    }
+
     // 2. Call real DeepSeek AI directly
     setIsLoading(true);
 
@@ -577,6 +585,30 @@ export default function ChatView({
 
       {/* Input Box Bar */}
       <div className="p-3.5 border-t border-[#2e2e2e] bg-[#1a1a1a]/95 backdrop-blur shrink-0">
+        {/* Quick Logbook Sync Helper Banner */}
+        {reportData?.logbooks?.length > 0 && (
+          <div className="max-w-3xl mx-auto mb-2.5 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 flex items-center justify-between text-xs text-amber-200 shadow-sm animate-in fade-in duration-300">
+            <div className="flex items-center space-x-2 truncate">
+              <BookCheck className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="truncate">
+                Una <strong>Wiki {reportData.logbooks.length}</strong> zilizojazwa kwenye Logbook.
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                if (onSyncAllLogbooks) onSyncAllLogbooks(reportData.logbooks);
+                confetti({ particleCount: 70, spread: 80, origin: { y: 0.7 } });
+                handleSend(`Nimeshajaza logbook ya Wiki 1 hadi ${reportData.logbooks.length}. Vuta kazi zote hizi moja kwa moja uziweke kwenye Chapter 2 na Chapter 3 bila kuniuliza tena maswali.`);
+              }}
+              className="ml-2 px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition flex items-center space-x-1 shrink-0 shadow cursor-pointer text-[11px]"
+              title="Vuta kazi zote za logbook moja kwa moja kwenye Chapter 2 na 3"
+            >
+              <Zap className="w-3.5 h-3.5 fill-current" />
+              <span>Vuta Kwenye Ripoti</span>
+            </button>
+          </div>
+        )}
+
         <div className={`max-w-3xl mx-auto flex items-end space-x-2 rounded-2xl border p-2 transition-all shadow-xl ${
           !logbookMode
             ? 'bg-[#202020] border-[#303030] opacity-60'

@@ -357,16 +357,31 @@ function buildMasterSystemPrompt(reportData) {
    • STEP 2: CHAPTER 1 INTERVIEW (COMPANY OVERVIEW):
      - Ask ONLY: "Ulikuwa kwenye kitengo au idara gani hapo kampuni/kazini?"
      - Once answered: Generate ALL sections of Chapter 1 in json_action (action: "update_chapter", chapterId: "chap1").
-     - In chat, say: "Chapter 1 imekamilika kikamilifu na kujazwa kwenye A4! Sasa tunaingia Chapter 2 (Kazi za Vitendo / Technical Duties Undertaken)."
+     - In chat:
+       • IF logbooks exist in reportData.logbooks (logbooksCount > 0):
+         Output action: "update_chapter", chapterId: "chap2" immediately with all duties from logbook, and announce: "Chapter 1 imekamilika! Na kwa kuwa ulishajaza Logbook yako, nimevuta kazi zako zote za vitendo na kuziandika moja kwa moja kwenye Chapter 2 kwenye A4! Sasa tunaweza kuendelea na Chapter 3 au Chapter 4."
+       • IF NO logbook exists (logbooksCount === 0):
+         Say: "Chapter 1 imekamilika kikamilifu na kujazwa kwenye A4! Sasa tunaingia Chapter 2 (Kazi za Vitendo / Technical Duties Undertaken). Tuanze kazi ya kwanza (2.2.1): Ni kazi au shughuli gani ya vitendo uliyoifanya field?"
 
-   • STEP 3: CHAPTER 2 INTERVIEW (PRACTICAL TECHNICAL TASKS):
-     - Ask for Task 1: "Tuanze kazi ya kwanza (2.2.1): Ni kazi au shughuli gani ya vitendo uliyoifanya field?"
-     - Once student answers with task: Expand into an authoritative engineering task in json_action (action: "add_task").
-     - Ask for Task 2: "Kazi ya pili ya vitendo (2.2.2) uliyofanya ilikuwa ipi?"
-     - Expand into task 2.
-     - Ask for Task 3: "Kazi ya tatu ya vitendo (2.2.3) uliyofanya ilikuwa ipi?"
-     - Expand into task 3.
-     - When at least 3 tasks are recorded: Ask: "Je, una kazi nyingine ya vitendo uliyoifanya field, au tuendelee na Chapter 3 (Skills & Methodology)?" Chips: ["Ongeza Kazi Nyingine", "Endelea na Chapter 3"].
+   • STEP 3: CHAPTER 2 (PRACTICAL TECHNICAL TASKS & LOGBOOK INTEGRATION):
+     - ⚠️ CRITICAL LOGBOOK CHECK:
+       If the student has ALREADY filled logbook entries in reportData.logbooks (logbooksCount > 0) OR asks to pull from logbook:
+       - ⚠️ STRICT PROHIBITION: NEVER ask "Tuanze kazi ya kwanza: ni kazi gani uliyoifanya field?" when logbook entries already exist! The student already documented their practical duties in the logbook!
+       - AUTOMATICALLY pull and synthesize all weekly technical tasks from their logbook into Chapter 2 (sections 2.2.1, 2.2.2, 2.2.3, etc.).
+       - In json_action, output action: "update_chapter", chapterId: "chap2", with thorough, dense, rigorous technical engineering sections for each week/milestone from their logbook, complete with tools used, methodology, and safety precautions.
+       - Also populate Chapter 3 (Skills & Methodology) with competencies and skillsGained from the logbook.
+       - In your chat message in Swahili, warmly confirm:
+         "Nimevuta kiotomatiki kazi zote za vitendo ulizojaza kwenye Logbook yako (Wiki 1 hadi [X]) na kuziandika kwa kina katika Chapter 2 (na ujuzi katika Chapter 3) kwenye A4! Sasa tunaweza kuendelea moja kwa moja na Sura ya 4 (Gaps in Technology) au una swali lolote?"
+       - Provide chips: ["Endelea na Chapter 4", "Kagua Chapter 2 Kwenye Docs", "Ongeza Kazi Nyingine"].
+
+     - ONLY IF NO LOGBOOK ENTRIES EXIST (logbooksCount === 0):
+       - Ask for Task 1: "Tuanze kazi ya kwanza (2.2.1): Ni kazi au shughuli gani ya vitendo uliyoifanya field?"
+       - Once student answers with task: Expand into an authoritative engineering task in json_action (action: "add_task").
+       - Ask for Task 2: "Kazi ya pili ya vitendo (2.2.2) uliyofanya ilikuwa ipi?"
+       - Expand into task 2.
+       - Ask for Task 3: "Kazi ya tatu ya vitendo (2.2.3) uliyofanya ilikuwa ipi?"
+       - Expand into task 3.
+       - When at least 3 tasks are recorded: Ask: "Je, una kazi nyingine ya vitendo uliyoifanya field, au tuendelee na Chapter 3 (Skills & Methodology)?" Chips: ["Ongeza Kazi Nyingine", "Endelea na Chapter 3"].
 
    • STEP 4: CHAPTER 3 INTERVIEW (SKILLS & METHODOLOGY):
      - Ask ONLY: "Chapter 3: Ni ujuzi gani mpya wa vitendo au mifumo uliyojifunza field ambao hukuwa nao chuoni?"
@@ -489,7 +504,14 @@ ${JSON.stringify({
       title: c.title,
       sectionsCount: c.sections?.length || 0
     })),
-    logbooksCount: reportData?.logbooks?.length || 0
+    logbooksCount: reportData?.logbooks?.length || 0,
+    logbooks: (reportData?.logbooks || []).map(l => ({
+      weekNumber: l.weekNumber,
+      title: l.title,
+      weeklySummary: l.weeklySummary,
+      skillsGained: l.skillsGained,
+      days: (l.days || []).map(d => ({ day: d.day, task: d.task, tools: d.tools }))
+    }))
   }, null, 2)}
 \`\`\`
 
