@@ -15,6 +15,7 @@ import { synchronizeReport } from './services/reportSynchronizer';
 import { getStoredGoogleUser, saveGoogleUser, removeGoogleUser } from './services/googleAuth';
 import { analyticsService } from './services/analyticsService';
 import { DEFAULT_HIVE_KEY, DEFAULT_MODEL } from './services/aiEngine';
+import { safeSetItem } from './utils/storage';
 
 export default function App() {
   // Google Authentication State
@@ -165,10 +166,10 @@ export default function App() {
   const [activeChapterTab, setActiveChapterTab] = useState('cover');
   const [isSplitView, setIsSplitView] = useState(true);
 
-  // Auto-save active report data and update sessions history
+  // Auto-save active report data and update sessions history safely
   useEffect(() => {
-    localStorage.setItem('dit_report_clean_v3', JSON.stringify(reportData));
-    localStorage.setItem('dit_active_session_id', currentSessionId);
+    safeSetItem('dit_report_clean_v3', JSON.stringify(reportData));
+    safeSetItem('dit_active_session_id', currentSessionId);
 
     // Update active session in history list
     setSessions(prevSessions => {
@@ -213,8 +214,10 @@ export default function App() {
         ];
       }
 
-      localStorage.setItem('dit_report_sessions_v1', JSON.stringify(updated));
-      return updated;
+      // Keep only the 5 most recent sessions to prevent unbounded storage growth
+      const trimmed = updated.slice(0, 5);
+      safeSetItem('dit_report_sessions_v1', JSON.stringify(trimmed));
+      return trimmed;
     });
   }, [reportData, currentSessionId]);
 
@@ -522,7 +525,7 @@ export default function App() {
   const handleDeleteSession = (sessionId) => {
     const remaining = sessions.filter(s => s.id !== sessionId);
     setSessions(remaining);
-    localStorage.setItem('dit_report_sessions_v1', JSON.stringify(remaining));
+    safeSetItem('dit_report_sessions_v1', JSON.stringify(remaining));
 
     if (sessionId === currentSessionId) {
       if (remaining.length > 0) {
@@ -547,9 +550,9 @@ export default function App() {
       reportData: INITIAL_REPORT_STATE
     };
 
-    const updated = [newSession, ...sessions];
+    const updated = [newSession, ...sessions].slice(0, 5);
     setSessions(updated);
-    localStorage.setItem('dit_report_sessions_v1', JSON.stringify(updated));
+    safeSetItem('dit_report_sessions_v1', JSON.stringify(updated));
     setCurrentSessionId(newId);
     setReportData(INITIAL_REPORT_STATE);
     localStorage.removeItem('dit_chat_messages_v4');

@@ -12,6 +12,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { buildDynamicTableOfContents, buildDynamicTableOfFigures } from '../services/reportSynchronizer.js';
+import { compressImageFile } from '../services/imageCompressor.js';
 
 export default function DocumentDrawer({
   isOpen,
@@ -35,16 +36,20 @@ export default function DocumentDrawer({
   const uniName = metadata.universityName || 'DAR ES SALAAM INSTITUTE OF TECHNOLOGY (DIT)';
   const uniAcronym = metadata.universityId ? metadata.universityId.toUpperCase() : 'DIT';
 
-  const handleImageUpload = (chapterId, sectionId, file) => {
+  // Handle local image file upload for a section with automatic high-ratio compression
+  const handleImageUpload = async (chapterId, sectionId, file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      onUpdateSection(chapterId, sectionId, {
-        image: e.target.result,
-        imageCaption: `Setup and execution of ${file.name.replace(/\.[^/.]+$/, "")}`
-      });
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressedDataUrl = await compressImageFile(file, 900, 900, 0.75);
+      if (compressedDataUrl) {
+        onUpdateSection(chapterId, sectionId, {
+          image: compressedDataUrl,
+          imageCaption: `Setup and execution of ${file.name.replace(/\.[^/.]+$/, "")}`
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to compress image:', err);
+    }
   };
 
   const handlePrint = () => {
