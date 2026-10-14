@@ -432,6 +432,70 @@ export default function App() {
     });
   };
 
+  const handleSyncAllLogbooksToReport = (logbooksList) => {
+    const list = logbooksList || reportData.logbooks || [];
+    if (!list || list.length === 0) return 0;
+
+    let addedCount = 0;
+    setReportData(prev => {
+      const chap2 = prev.chapters.find(c => c.id === 'chap2') || { sections: [] };
+      const chap3 = prev.chapters.find(c => c.id === 'chap3') || { sections: [] };
+
+      let updatedChap2Sections = [...(chap2.sections || [])];
+      let updatedChap3Sections = [...(chap3.sections || [])];
+
+      list.forEach((logbook, idx) => {
+        const weekTag = `w${logbook.weekNumber}`;
+        const alreadyExists = updatedChap2Sections.some(s => s.id && s.id.includes(`_logbook_${weekTag}`));
+        if (alreadyExists) return;
+
+        addedCount++;
+        const nextIndex = (updatedChap2Sections.filter(s => s.code && (s.code.startsWith('2.2') || s.code.startsWith('2.'))).length || 0) + 1;
+        const combinedContent = `${logbook.weeklySummary || ''}\n\nKey Daily Technical Milestones Executed:\n` +
+          (logbook.days || []).map(d => `• ${d.day}: ${d.task}`).join('\n\n');
+        const allTools = Array.from(new Set((logbook.days || []).flatMap(d => d.tools || [])));
+
+        updatedChap2Sections.push({
+          id: `s2_2_logbook_${weekTag}_${Date.now()}_${idx}`,
+          code: `2.2.${nextIndex}`,
+          title: logbook.title || `Technical Work Done in Week ${logbook.weekNumber}`,
+          content: combinedContent,
+          persona: 'methodological',
+          tools: allTools,
+          vivaTip: {
+            question: `What primary technical tasks and safety precautions were applied during ${logbook.title || `Week ${logbook.weekNumber}`}?`,
+            expectedAnswer: logbook.skillsGained || 'Executed structured technical duties in alignment with engineering safety standards.'
+          }
+        });
+
+        if (logbook.skillsGained) {
+          const existing32 = updatedChap3Sections.find(s => s.code === '3.2');
+          if (existing32) {
+            existing32.content = `${existing32.content}\n\nWeek ${logbook.weekNumber} Competencies:\n${logbook.skillsGained}`;
+          } else {
+            updatedChap3Sections.push({
+              id: `s3_2_${weekTag}`,
+              code: `3.2.${logbook.weekNumber}`,
+              title: `Competencies Mastered in Week ${logbook.weekNumber}`,
+              content: logbook.skillsGained
+            });
+          }
+        }
+      });
+
+      return synchronizeReport({
+        ...prev,
+        chapters: prev.chapters.map(chap => {
+          if (chap.id === 'chap2') return { ...chap, sections: updatedChap2Sections };
+          if (chap.id === 'chap3') return { ...chap, sections: updatedChap3Sections };
+          return chap;
+        })
+      });
+    });
+
+    return addedCount;
+  };
+
   const handleExportDocx = async () => {
     setIsExporting(true);
     try {
@@ -488,7 +552,9 @@ export default function App() {
     localStorage.setItem('dit_report_sessions_v1', JSON.stringify(updated));
     setCurrentSessionId(newId);
     setReportData(INITIAL_REPORT_STATE);
+    localStorage.removeItem('dit_chat_messages_v4');
     localStorage.removeItem('dit_chat_messages_v3');
+    localStorage.removeItem('dit_logbook_mode');
     setIsSidebarOpen(false);
   };
 
@@ -543,6 +609,7 @@ export default function App() {
             onOpenProfile={() => setIsProfileOpen(true)}
             onOpenStructures={() => setIsStructureModalOpen(true)}
             onOpenLogbook={() => setIsLogbookModalOpen(true)}
+            onSyncAllLogbooks={handleSyncAllLogbooksToReport}
             onOpenAdmin={() => setIsAdminOpen(true)}
             onSelectChapter={(tab) => setActiveChapterTab(tab)}
             isSplitView={isSplitView}

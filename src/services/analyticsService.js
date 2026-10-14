@@ -10,7 +10,7 @@ const STORAGE_KEY_ANNOUNCEMENT = 'report_ai_prod_announcement_v1';
 const STORAGE_KEY_ADMIN_PASS = 'report_ai_admin_master_key_v1';
 
 // Default strong production master password
-const DEFAULT_MASTER_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'ReportAI#Master2026!$';
+const DEFAULT_MASTER_PASSWORD = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ADMIN_PASSWORD) || 'ReportAI#Master2026!$';
 
 // Helper to calculate estimated DeepSeek API cost ($0.14 per 1M input, $0.28 per 1M output approx)
 export const calculateApiCostUSD = (tokens) => {

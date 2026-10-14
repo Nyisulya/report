@@ -1,10 +1,11 @@
 import { getVivaTipForActivity } from '../data/vivaQuestions.js';
 import { getUniversityStructure } from '../data/universityStructures.js';
 import { analyticsService } from './analyticsService.js';
+import { jsonrepair } from 'jsonrepair';
 
-export const DEFAULT_HIVE_KEY = import.meta.env.VITE_HIVE_API_KEY || import.meta.env.VITE_DEEPSEEK_API_KEY || '';
-export const DEFAULT_HIVE_BASE_URL = import.meta.env.VITE_HIVE_BASE_URL || '/api/hive';
-export const DEFAULT_MODEL = import.meta.env.VITE_HIVE_MODEL || 'deepseek-ai/deepseek-v4.1-flash';
+export const DEFAULT_HIVE_KEY = (typeof import.meta !== 'undefined' && (import.meta.env?.VITE_HIVE_API_KEY || import.meta.env?.VITE_DEEPSEEK_API_KEY)) || '';
+export const DEFAULT_HIVE_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_HIVE_BASE_URL) || '/api/hive';
+export const DEFAULT_MODEL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_HIVE_MODEL) || 'deepseek-ai/deepseek-v4.1-flash';
 
 // Backwards compatibility alias
 export const DEFAULT_DEEPSEEK_KEY = DEFAULT_HIVE_KEY;
@@ -33,6 +34,197 @@ export function resolveActiveCredentials({ apiKey, modelName, baseUrl } = {}) {
   }
 
   return { activeKey, activeModel, activeBaseUrl };
+}
+
+/**
+ * Ultra-resilient JSON parser:
+ * 1. Extracts JSON from markdown fences or bare objects
+ * 2. Uses jsonrepair to fix unescaped double quotes, missing commas, truncated strings
+ * 3. Cleans control characters
+ * 4. Normalizes malformed structures
+ */
+export function safeParseJSON(input) {
+  if (!input) return null;
+  let text = typeof input === 'string' ? input.trim() : String(input);
+
+  // 1. Try extracting inside markdown ```json ... ``` or ```json_action ... ```
+  const codeMatch = text.match(/```(?:json_action|json)?\s*([\s\S]*?)\s*```/i);
+  if (codeMatch) {
+    text = codeMatch[1].trim();
+  }
+
+  // 2. Isolate outermost JSON object or array
+  const firstBrace = text.indexOf('{');
+  const firstBracket = text.indexOf('[');
+  let startIdx = -1;
+  let endIdx = -1;
+
+  if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+    startIdx = firstBrace;
+    endIdx = text.lastIndexOf('}');
+  } else if (firstBracket !== -1) {
+    startIdx = firstBracket;
+    endIdx = text.lastIndexOf(']');
+  }
+
+  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+    text = text.substring(startIdx, endIdx + 1);
+  }
+
+  // 3. Direct JSON.parse
+  try {
+    return JSON.parse(text);
+  } catch (e1) {
+    // Continue
+  }
+
+  // 4. jsonrepair directly
+  try {
+    const repaired = jsonrepair(text);
+    return JSON.parse(repaired);
+  } catch (e2) {
+    // Continue
+  }
+
+  // 5. Clean control characters and try jsonrepair
+  try {
+    const sanitized = sanitizeRawJSON(text);
+    const repaired = jsonrepair(sanitized);
+    return JSON.parse(repaired);
+  } catch (e3) {
+    // Continue
+  }
+
+  // 6. Fix internal unescaped double quotes e.g. "key": "Value "quoted" inside"
+  try {
+    const cleanedQuotes = text.replace(/([a-zA-Z0-9_\s])"([a-zA-Z0-9_\s]+)"([a-zA-Z0-9_\s])/g, "$1'$2'$3");
+    const repaired = jsonrepair(cleanedQuotes);
+    return JSON.parse(repaired);
+  } catch (e4) {
+    // Continue
+  }
+
+  return null;
+}
+
+export function sanitizeRawJSON(str) {
+  if (!str) return '{}';
+  let insideString = false;
+  let escaped = false;
+  let result = '';
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i];
+    if (char === '"' && !escaped) {
+      insideString = !insideString;
+      result += char;
+    } else if (insideString) {
+      if (char === '\n') result += '\\n';
+      else if (char === '\r') result += '\\r';
+      else if (char === '\t') result += '\\t';
+      else if (char.charCodeAt(0) < 32) {
+        // drop control char
+      } else {
+        result += char;
+      }
+    } else {
+      result += char;
+    }
+    escaped = (char === '\\' && !escaped);
+  }
+  return result;
+}
+
+export function buildEmergencyFallbackLogbook({ weekNumber = 1, briefInput = '', dailyInputs = null, deptName = 'Engineering', firm = 'Host Firm' } = {}) {
+  const mainTopic = (briefInput && briefInput.trim()) || (dailyInputs && dailyInputs.monday && dailyInputs.monday.trim()) || 'Practical Engineering Systems and Maintenance Operations';
+  return {
+    weekNumber,
+    title: `Week ${weekNumber}: Practical Engineering & Technical Operations`,
+    briefInput: briefInput || '',
+    page1_dailySummary: [
+      {
+        day: 'Monday',
+        heading: dailyInputs?.monday?.trim() || `Technical Briefing & Theoretical Orientation on ${mainTopic}`,
+        inShort: `Studied standard operational frameworks, equipment specifications, and safety guidelines for ${mainTopic}.`,
+        tools: ['Engineering Manuals', 'Workstation', 'Safety PPE']
+      },
+      {
+        day: 'Tuesday',
+        heading: dailyInputs?.tuesday?.trim() || `Workspace Setup & Preliminary Testing`,
+        inShort: `Configured parameters, checked hardware/software prerequisites, and conducted baseline tests.`,
+        tools: ['Diagnostic Tools', 'Testing Equipment', 'Workstation']
+      },
+      {
+        day: 'Wednesday',
+        heading: dailyInputs?.wednesday?.trim() || `Core Implementation & Module Integration`,
+        inShort: `Executed hands-on operations, connected necessary components, and verified technical connectivity.`,
+        tools: ['Core System Tools', 'Multimeter / IDE', 'Interface Cables']
+      },
+      {
+        day: 'Thursday',
+        heading: dailyInputs?.thursday?.trim() || `System Diagnostics & Error Troubleshooting`,
+        inShort: `Investigated operational discrepancies, resolved configuration conflicts, and ensured stability.`,
+        tools: ['Debug Consoles', 'Measurement Gauges', 'Troubleshooting Checklist']
+      },
+      {
+        day: 'Friday',
+        heading: dailyInputs?.friday?.trim() || `Weekly Performance Review & Site Maintenance`,
+        inShort: `Carried out preventive routine maintenance, documented activity logs, and submitted status report.`,
+        tools: ['Maintenance Kit', 'Logbook Documentation', 'Review Templates']
+      }
+    ],
+    page2_detailedReport: {
+      topic: `${mainTopic} Execution and Implementation`,
+      sections: [
+        {
+          heading: `1.0 Technical Background & Operational Scope`,
+          content: `Practical assignments focused on the systematic implementation of ${mainTopic} under industrial supervision. Necessary engineering precautions and standard operational protocols were maintained throughout.`
+        },
+        {
+          heading: `2.0 Practical Execution & Workflow Procedure`,
+          content: `All prerequisite configurations and functional modules were prepared sequentially. Testing benches and operational equipment were deployed to monitor parameter conformity and performance standards.`
+        },
+        {
+          heading: `3.0 Quality Assurance & Verification Testing`,
+          content: `The executed setup underwent functional checks and validation. Test cycles verified full stability and alignment with technical guidelines established by the department.`
+        }
+      ],
+      toolsAndEquipment: ['Technical Workstation', 'Testing Instruments', 'Standard PPE Kit']
+    },
+    page3_detailedReport: {
+      sections: [
+        {
+          heading: `4.0 Diagnostic Challenges & Remedial Actions`,
+          content: `Encountered unexpected operational variances during execution. Systematic diagnostic troubleshooting was carried out to pinpoint the anomaly and implement a permanent engineering resolution.`
+        },
+        {
+          heading: `5.0 Health, Safety & Environmental (HSE) Compliance`,
+          content: `Followed all mandatory workshop safety precautions, proper equipment grounding, and clean workstation hygiene to prevent accidents and equipment damage.`
+        },
+        {
+          heading: `6.0 Technical Competencies & Engineering Skills Gained`,
+          content: `Acquired comprehensive hands-on proficiency in practical fault isolation, tool handling, and system calibration applicable to field engineering environments.`
+        }
+      ],
+      safetyPrecautions: 'Observed strict PPE standards, proper tool handling, and regular inspection of workspace safety barriers.',
+      challengesAndSolutions: 'Isolated operational errors through methodical testing and resolved calibration discrepancies effectively.',
+      skillsLearnt: 'Gained practical dexterity in technical maintenance, troubleshooting procedures, and operational documentation.'
+    },
+    page4_technicalDiagram: {
+      hasDiagram: true,
+      diagramTitle: `Figure W${weekNumber}.1: System Flowchart & Operational Architecture`,
+      diagramType: 'Architecture Flowchart',
+      recommendationAdvice: 'Illustrates the sequential stages of the technical workflow undertaken during the training week.',
+      stepByStepDrawingInstructions: [
+        '1. Use a pencil and ruler to draw input and processing blocks representing the workflow.',
+        '2. Connect the operational stages with directional arrows indicating signal or task flow.',
+        '3. Add a decision diamond for diagnostic verification and error handling.',
+        '4. Clearly label all endpoints, modules, and testing checkpoints.'
+      ],
+      keyLabelsToInclude: ['Input Stage', 'Processing Unit', 'Verification Test', 'Output / Resolution'],
+      asciiPreview: '+-------------+    +----------------+    +----------------+\n| Input Stage | -> | Processing Unit| -> | Output / Result|\n+-------------+    +----------------+    +----------------+',
+      alternativeAction: 'Attach a worksite photograph or operational schematic.'
+    }
+  };
 }
 
 // Anti-AI cliché filtering
@@ -100,61 +292,74 @@ function buildMasterSystemPrompt(reportData) {
     ? `Official Field Practical Training Assessor and Academic Copilot for The Institute of Finance Management (IFM)`
     : `Official Technical Report AI Assessor and Senior Engineering Copilot for ${uniName} (${uniShort})`;
 
-  const interviewProtocol = isIFM ? `
-   • When student selects or mentions CHAPTER 1 (INTRODUCTION):
-     - If company details are missing: DO NOT write Chapter 1 yet. ASK: "Tuanze Chapter 1: Shirika/Kampuni ulilofanyia field linaitwaje (k.m. NSSF, CRDB, TRA), lipo mkoa gani, na ulikuwa kitengo/idara gani?" and provide chips.
-     - Once student gives info: Generate the full 6 academic sections of Chapter 1 (1.1 Intro, 1.2 Attachment Overview & Objectives, 1.3 Host Org Overview & Dept, 1.4 Org Structure, 1.5 Industry Review, 1.6 Report Structure) in \`json_action\` (\`action: "update_chapter"\`), then ASK: "Chapter 1 imekamilika! Uko tayari tuanze Chapter 2 (Work Done & Lessons Learnt)?"
+  const interviewProtocol = `
+   • STRICT LAW 1: ONLY ONE QUESTION AT A TIME (KANUNI YA SWALI MOJA TU):
+     - ⚠️ STRICT PROHIBITION: NEVER ask two, three, or multiple questions in one message!
+     - ⚠️ NEVER bundle questions together (e.g. NEVER ask "Namba ya usajili, Program na Department ni ipi?" in one message)!
+     - ALWAYS ask EXACTLY ONE question, very short, punchy, and simple (swali moja tu tena fupi kabisa) in friendly Swahili.
+     - Wait for the student to reply before asking the next single question.
+     - Always provide clickable chips that are direct, relevant answers to THAT SINGLE QUESTION only.
 
-   • When student selects or mentions CHAPTER 2 (WORK DONE AND LESSONS LEARNT):
-     - In \`json_action\`, set \`action: "update_chapter"\` containing "2.1 Chapter Introduction".
-     - ASK: "Karibu Chapter 2! Tuanze na kazi ya kwanza uliyoifanya (2.2.1): Ni majukumu gani uliyotekeleza (k.m. Member enrollment katika SHIB, Contribution verification, Claims processing, Cashier/Banking reconciliation)?"
-     - When student names their task: Expand into 2.2.X Description of Task, 2.3.X Lessons Learnt, 2.4 Summary of Work, and 2.5 Challenges Encountered.
+   • STRICT LAW 2: STRICT SEQUENTIAL PROGRESSION (KATAZO LA KURUKA SURA):
+     - ⚠️ STRICT PROHIBITION: DO NOT LET THE STUDENT SKIP CHAPTERS OR PICK WHAT TO DO FREELY!
+     - The report MUST follow a strict, mandatory one-way pipeline:
+       [1. COVER PAGE] ➔ [2. CHAPTER 1] ➔ [3. CHAPTER 2] ➔ [4. CHAPTER 3] ➔ [5. CHAPTER 4] ➔ [6. CHAPTER 5] ➔ [7. SMART COMPILE].
+     - NEVER provide chips like "Chapter 2", "Chapter 3", or "Nenda Chapter Inayofuata" when the current chapter is still incomplete!
+     - You must complete Chapter 1 100% before moving to Chapter 2.
+     - You must complete Chapter 2 before moving to Chapter 3.
+     - Exception: ONLY if the entire report is 100% finished and the student explicitly asks to edit an earlier chapter.
 
-   • When student selects or mentions CHAPTER 3 (LITERATURE REVIEW):
-     - ASK: "Chapter 3 ni Literature Review ya kitaaluma: Tuchambue machapisho na nadharia gani za kimasomo (k.m. DAMA Data Management, COSO Internal Controls, SERVQUAL Service Quality, ILO Social Protection, ISO Records Management)?"
-     - Generate an authoritative academic Literature Review with formal APA citations.
+   • STEP 1: COVER PAGE SEQUENTIAL INTERVIEW (ONE QUESTION PER TURN):
+     - If studentName is missing: Ask ONLY: "Jina lako kamili la mwanafunzi unaitwa nani?"
+     - If studentName is known but admissionNo is missing: In json_action, update metadata.studentName. In chat, ask ONLY: "Namba yako ya usajili (Admission / Registration Number) ni ipi?"
+     - If admissionNo is known but program is missing: In json_action, update metadata.admissionNo. In chat, ask ONLY: "Programu au kozi unayosoma chuoni inaitwaje?"
+     - If program is known but department is missing: In json_action, update metadata.program. In chat, ask ONLY: "Idara (Department) yako chuoni ni ipi?"
+     - If department is known but firm is missing: In json_action, update metadata.department. In chat, ask ONLY: "Kampuni au shirika ulilofanyia field linaitwaje?"
+     - If firm is known but location is missing: In json_action, update metadata.firm. In chat, ask ONLY: "Kampuni hii inapatikana mkoa au eneo gani?"
+     - Once location is provided: In json_action, update metadata.firmLocation. Cover Page is now 100% complete! In chat, say: "Jalada (Cover Page) limekamilika kikamilifu! Sasa tunaanza rasmi Sura ya Kwanza (Chapter 1: Company Profile)."
 
-   • When student selects or mentions CHAPTER 4 (ANALYSIS):
-     - ASK: "Chapter 4 ni Analysis: Tofauti gani na mapengo (gaps) uliziona kati ya nadharia ulizosoma darasani na utendaji halisi wa kazi (Theory vs Practice), na ujuzi gani umeimarika kwa taaluma yako?"
-     - Generate dense analytical sections: 4.1 Intro, 4.2 Comparison between Theory & Practice, 4.3 Skills Enhanced, 4.4 The Gap Between Theory & Practice, 4.5 Career Development.
+   • STEP 2: CHAPTER 1 INTERVIEW (COMPANY OVERVIEW):
+     - Ask ONLY: "Ulikuwa kwenye kitengo au idara gani hapo kampuni/kazini?"
+     - Once answered: Generate ALL sections of Chapter 1 in json_action (action: "update_chapter", chapterId: "chap1").
+     - In chat, say: "Chapter 1 imekamilika kikamilifu na kujazwa kwenye A4! Sasa tunaingia Chapter 2 (Kazi za Vitendo / Technical Duties Undertaken)."
 
-   • When student selects or mentions CHAPTER 5 (CONCLUSION AND RECOMMENDATIONS):
-     - ASK: "Chapter 5: Ushauri gani unatoa kwa IFM (k.m. Kuongeza mifumo ya vitendo, mitaala ya kidijitali) na ushauri kwa Taasisi/Kampuni (k.m. Kuboresha mifumo ya SHIB/ICT, mafunzo kwa watumishi)?"
-     - Generate 5.1 Conclusion, 5.2.1 Rec to IFM, 5.2.2 Rec to Host Org, and compile APA References.
-` : `
-   • When student selects or mentions CHAPTER 1:
-     - If company details are missing: DO NOT write Chapter 1 yet. In your chat message, ASK: "Tuanze Chapter 1: Kampuni au Shirika ulilofanyia field linaitwaje, liko wapi (Location), na ulikuwa kitengo gani?" and provide chips of common companies.
-     - Once student gives company info: Generate the full 5 deep sections of Chapter 1 in \`json_action\` (\`action: "update_chapter"\`), and then ASK: "Chapter 1 imekamilika na kujaza kurasa za A4! Uko tayari tuanze Chapter 2 (Technical Duties)?"
-   
-   • When student selects or mentions CHAPTER 2:
-     - DO NOT invent tasks by yourself!
-     - In \`json_action\`, set \`action: "update_chapter"\` containing ONLY "2.0 Introduction" and "2.1 Objectives".
-     - In your chat message, ASK: "Karibu Chapter 2! Tuanze na kazi ya kwanza ya vitendo (2.2.1): Ni kazi au shughuli gani ya kiufundi uliyoifanya field?" and provide department-specific activity chips!
-     - When student names their task: In your chat message, ASK: "Vifaa / tools gani mlitumia, na hitilafu gani ndogo ilijitokeza mkaitatua?" and provide tool chips.
-     - Once student replies: Expand their answer into an authoritative 300-word engineering duty (with tools, procedure, troubleshooting, and Viva tip) in \`json_action\` (\`action: "add_task"\`), and then ASK: "Kazi ya 2.2.X imeingia kwenye ripoti! Je, tuongeze kazi nyingine ya 2.2.Y au twende Chapter 3 (Skills)?"
-   
-   • When student selects or mentions CHAPTER 3 (SKILLS & METHODOLOGY):
-     - ASK: "Chapter 3: Ujuzi (skills) gani mpya ulijifunza field ambao hukuwa nao chuoni, na methodology gani mliitumia kufanya kazi?"
-   
-   • When student selects or mentions CHAPTER 4 (GAPS IN SKILLS & TECH):
-     - ASK: "Chapter 4: Teknolojia au vifaa gani vya kisasa uliviona field lakini chuoni havifundishwi au havipo maabara?"
-   
-   • When student selects or mentions CHAPTER 5 (CONCLUSIONS & RECOMMENDATIONS):
-     - ASK: "Chapter 5: Ushauri gani unatoa kwa chuo chako (${uniShort}) na ushauri gani kwa Kampuni/Host Firm?"
-     - Once Chapter 5 is written: Execute THE SMART COMPILE (harvest abbreviations and generate abstract in preliminaries).
+   • STEP 3: CHAPTER 2 INTERVIEW (PRACTICAL TECHNICAL TASKS):
+     - Ask for Task 1: "Tuanze kazi ya kwanza (2.2.1): Ni kazi au shughuli gani ya vitendo uliyoifanya field?"
+     - Once student answers with task: Expand into an authoritative engineering task in json_action (action: "add_task").
+     - Ask for Task 2: "Kazi ya pili ya vitendo (2.2.2) uliyofanya ilikuwa ipi?"
+     - Expand into task 2.
+     - Ask for Task 3: "Kazi ya tatu ya vitendo (2.2.3) uliyofanya ilikuwa ipi?"
+     - Expand into task 3.
+     - When at least 3 tasks are recorded: Ask: "Je, una kazi nyingine ya vitendo uliyoifanya field, au tuendelee na Chapter 3 (Skills & Methodology)?" Chips: ["Ongeza Kazi Nyingine", "Endelea na Chapter 3"].
+
+   • STEP 4: CHAPTER 3 INTERVIEW (SKILLS & METHODOLOGY):
+     - Ask ONLY: "Chapter 3: Ni ujuzi gani mpya wa vitendo au mifumo uliyojifunza field ambao hukuwa nao chuoni?"
+     - Once answered: Generate full Chapter 3 in json_action (action: "update_chapter", chapterId: "chap3").
+     - Announce Chapter 3 is done, and proceed immediately to Chapter 4.
+
+   • STEP 5: CHAPTER 4 INTERVIEW (GAPS IN SKILLS & TECH):
+     - Ask ONLY: "Chapter 4: Teknolojia au vifaa gani vya kisasa uliviona field lakini chuoni havifundishwi au havipo maabara?"
+     - Once answered: Generate full Chapter 4 in json_action (action: "update_chapter", chapterId: "chap4").
+     - Announce Chapter 4 is done, and proceed immediately to Chapter 5.
+
+   • STEP 6: CHAPTER 5 INTERVIEW (CONCLUSIONS & RECOMMENDATIONS):
+     - Ask ONLY: "Chapter 5: Ushauri gani unatoa kwa chuo chako (${uniShort}) na ushauri gani kwa Kampuni/Host Firm?"
+     - Once answered: Generate full Chapter 5 in json_action (action: "update_chapter", chapterId: "chap5").
+     - Execute THE SMART COMPILE (harvest abbreviations and generate abstract in preliminaries).
+     - Congratulate the student! The entire report is now 100% complete and ready for download as Word (.docx) or PDF!
 `;
 
   return `You are the ${roleTitle}.
 
 YOUR CORE PERSONALITY & INTELLIGENCE:
-1. NATURAL, HUMAN-LIKE & CONVERSATIONAL:
-   - Talk naturally and intelligently in friendly Swahili (using standard technical English terms where appropriate).
-   - NEVER sound robotic or use canned scripts. Think dynamically and respond specifically to whatever the student says.
-   - You can chat, give tips, explain concepts, answer presentation/Viva questions, guide the student, and write entire report chapters.
+1. STRICT SINGLE-QUESTION RULE (KANUNI YA SWALI MOJA TU):
+   - ⚠️ NEVER ASK TWO OR MORE QUESTIONS AT ONCE. Ask ONLY ONE question per turn!
+   - Keep chat messages short, encouraging, and clear (1 to 2 sentences).
+   - Put all academic document text in json_action.
 
-2. CONVERSATIONAL INTERVIEW PROTOCOL (MANDATORY BEHAVIOR):
-   - ⚠️ NEVER GENERATE CHAPTERS OR TASKS WITHOUT ASKING THE STUDENT FIRST!
-   - You are an interactive mentor. You must ask concise, smart questions in Swahili and provide clickable chips.
+2. STRICT SEQUENTIAL PROGRESSION (MTIRIRIKO WA MSTARI MMOJA BILA KURUKA):
+   - ⚠️ Never jump ahead or offer future chapter choices until the current chapter is fully done!
+   - Follow: Cover Page -> Chapter 1 -> Chapter 2 -> Chapter 3 -> Chapter 4 -> Chapter 5 -> Smart Preliminaries.
 ${interviewProtocol}
 
 3. DOCUMENT WRITING ARCHITECTURE & HIGH-DENSITY DEPTH:
@@ -238,7 +443,8 @@ ${JSON.stringify({
       number: c.number,
       title: c.title,
       sectionsCount: c.sections?.length || 0
-    }))
+    })),
+    logbooksCount: reportData?.logbooks?.length || 0
   }, null, 2)}
 \`\`\`
 
@@ -301,7 +507,7 @@ export async function sendChatMessageToAI({
     const actionMatch = rawContent.match(/```(?:json_action|json)\s*([\s\S]*?)\s*```/i);
     if (actionMatch) {
       try {
-        const parsed = JSON.parse(actionMatch[1].trim());
+        const parsed = safeParseJSON(actionMatch[1]);
         if (parsed && typeof parsed === 'object' && (parsed.action || parsed.metadata || parsed.task || parsed.sections || parsed.preliminaries || parsed.chips)) {
           actionData = parsed;
           if (actionData.chips && Array.isArray(actionData.chips)) {
@@ -694,7 +900,8 @@ CRITICAL INSTRUCTIONS FOR AUTHENTICITY, VARIETY & FLEXIBILITY:
    - 2. NO TOOLS IN DAILY HEADINGS: Keep tools strictly in the "tools" array, never in the daily task "heading".
    - 3. STRICT LENGTH LIMIT: Every section's "content" MUST fit in at most 2-3 lines on a computer screen (approx 35-50 words). Never generate long paragraphs!
    - 4. Avoid AI clichés (do NOT use delve, pivotal, seamless, testament, realm, tapestry, beacon, paramount, furthermore).
-   - 5. Return STRICTLY valid JSON with this exact structure:
+   - 5. CRITICAL JSON SYNTAX RULE: NEVER use unescaped double quotes (") inside string values. If referring to commands, codes, tools, or names, ALWAYS use single quotes (') like 'GET', 'API', 'Node.js', 'Postman'. Output MUST be strictly parseable JSON.
+   - 6. Return STRICTLY valid JSON with this exact structure:
 
 \`\`\`json
 {
@@ -782,7 +989,7 @@ CRITICAL INSTRUCTIONS FOR AUTHENTICITY, VARIETY & FLEXIBILITY:
       "4. ..."
     ],
     "keyLabelsToInclude": ["Label 1", "Label 2", "Label 3"],
-    "asciiPreview": "+-------------+\n| System Node |\n+-------------+",
+    "asciiPreview": "+-------------+\\n| System Node |\\n+-------------+",
     "alternativeAction": "If no diagram: leave blank or paste photo"
   }
 }
@@ -799,10 +1006,10 @@ CRITICAL INSTRUCTIONS FOR AUTHENTICITY, VARIETY & FLEXIBILITY:
       body: JSON.stringify({
         model: activeModel,
         messages: [
-          { role: 'system', content: 'You are an expert Tanzanian DIT Engineering IPT Assessor. You analyze the student\'s raw daily notes and generate authentic, matching engineering descriptions. Return ONLY valid JSON.' },
+          { role: 'system', content: 'You are an expert Tanzanian DIT Engineering IPT Assessor. You analyze the student\'s raw daily notes and generate authentic, matching engineering descriptions. Return ONLY a single raw valid JSON object. IMPORTANT: Do NOT use raw double quotes inside text values (use single quotes \'example\' instead). Output MUST be 100% valid JSON without markdown wrapping.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.7,
+        temperature: 0.5,
         max_tokens: 3800
       })
     });
@@ -815,59 +1022,46 @@ CRITICAL INSTRUCTIONS FOR AUTHENTICITY, VARIETY & FLEXIBILITY:
     const data = await res.json();
     const rawText = data?.choices?.[0]?.message?.content || '';
 
-    // Robust JSON extraction, control-character sanitization, and auto-repair
-    function sanitizeJSON(str) {
-      if (!str) return '{}';
-      let insideString = false;
-      let escaped = false;
-      let result = '';
-      for (let i = 0; i < str.length; i++) {
-        const char = str[i];
-        if (char === '"' && !escaped) {
-          insideString = !insideString;
-          result += char;
-        } else if (insideString) {
-          if (char === '\n') result += '\\n';
-          else if (char === '\r') result += '\\r';
-          else if (char === '\t') result += '\\t';
-          else if (char.charCodeAt(0) < 32) {
-            // drop non-printable control character
-          } else {
-            result += char;
-          }
-        } else {
-          result += char;
-        }
-        escaped = (char === '\\' && !escaped);
-      }
-      return result;
-    }
+    let parsed = safeParseJSON(rawText);
 
-    let parsed = null;
-    try {
-      const match = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-      let jsonStr = match ? match[1].trim() : rawText.trim();
-      const firstBrace = jsonStr.indexOf('{');
-      const lastBrace = jsonStr.lastIndexOf('}');
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+    if (!parsed || typeof parsed !== 'object') {
+      console.warn('safeParseJSON failed to parse raw text, activating emergency fallback logbook builder...');
+      parsed = buildEmergencyFallbackLogbook({
+        weekNumber,
+        briefInput,
+        dailyInputs,
+        deptName,
+        firm
+      });
+    } else {
+      // Ensure all critical sections exist even if the model omitted one
+      const fallback = buildEmergencyFallbackLogbook({
+        weekNumber,
+        briefInput,
+        dailyInputs,
+        deptName,
+        firm
+      });
+
+      if (!parsed.page1_dailySummary || !Array.isArray(parsed.page1_dailySummary) || parsed.page1_dailySummary.length === 0) {
+        parsed.page1_dailySummary = fallback.page1_dailySummary;
+      } else if (parsed.page1_dailySummary.length < 5) {
+        while (parsed.page1_dailySummary.length < 5) {
+          parsed.page1_dailySummary.push(fallback.page1_dailySummary[parsed.page1_dailySummary.length]);
+        }
       }
-      parsed = JSON.parse(sanitizeJSON(jsonStr));
-    } catch (parseErr) {
-      console.warn('Direct JSON parse failed, attempting auto-repair with sanitization...', parseErr);
-      let repaired = rawText;
-      const firstBrace = repaired.indexOf('{');
-      if (firstBrace !== -1) repaired = repaired.substring(firstBrace);
-      repaired = repaired.replace(/,\s*([\]}])/g, '$1');
-      const quotes = (repaired.match(/(?<!\\)"/g) || []).length;
-      if (quotes % 2 !== 0) repaired += '"';
-      const openBraces = (repaired.match(/\{/g) || []).length;
-      const closeBraces = (repaired.match(/\}/g) || []).length;
-      for (let i = 0; i < openBraces - closeBraces; i++) repaired += '}';
-      const openBrackets = (repaired.match(/\[/g) || []).length;
-      const closeBrackets = (repaired.match(/\]/g) || []).length;
-      for (let i = 0; i < openBrackets - closeBrackets; i++) repaired += ']';
-      parsed = JSON.parse(sanitizeJSON(repaired));
+
+      if (!parsed.page2_detailedReport || !parsed.page2_detailedReport.sections || !Array.isArray(parsed.page2_detailedReport.sections)) {
+        parsed.page2_detailedReport = fallback.page2_detailedReport;
+      }
+
+      if (!parsed.page3_detailedReport || !parsed.page3_detailedReport.sections || !Array.isArray(parsed.page3_detailedReport.sections)) {
+        parsed.page3_detailedReport = fallback.page3_detailedReport;
+      }
+
+      if (!parsed.page4_technicalDiagram) {
+        parsed.page4_technicalDiagram = fallback.page4_technicalDiagram;
+      }
     }
 
     // Normalize backward compatibility fields

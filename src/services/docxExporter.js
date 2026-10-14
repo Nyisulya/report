@@ -15,7 +15,8 @@ import {
   TableCell,
   WidthType,
   BorderStyle,
-  convertInchesToTwip
+  convertInchesToTwip,
+  ImageRun
 } from 'docx';
 import { saveAs } from 'file-saver';
 import { buildDynamicTableOfContents, buildDynamicTableOfFigures } from './reportSynchronizer';
@@ -682,15 +683,43 @@ function buildChaptersParagraphs(chapters = [], metadata = {}) {
         }
       });
 
-      // Section Figure caption
+      // Section Figure image & caption
+      if (sec.image) {
+        try {
+          const base64Data = sec.image.includes(',') ? sec.image.split(',')[1] : sec.image;
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let b = 0; b < binaryString.length; b++) {
+            bytes[b] = binaryString.charCodeAt(b);
+          }
+          elements.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 180, after: 80 },
+              children: [
+                new ImageRun({
+                  data: bytes,
+                  transformation: {
+                    width: 440,
+                    height: 280
+                  }
+                })
+              ]
+            })
+          );
+        } catch (imgErr) {
+          console.warn('Could not embed image into DOCX:', imgErr);
+        }
+      }
+
       if (sec.imageCaption || sec.image) {
         elements.push(
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 120, after: 160 },
+            spacing: { before: 60, after: 160 },
             children: [
               new TextRun({
-                text: `[ Figure: ${sec.imageCaption || `${sec.title} Execution and Testing`} ]`,
+                text: `Figure ${chap.number}.${secIdx + 1}: ${sec.imageCaption || `${sec.title} Demonstration / Setup`}`,
                 italics: true,
                 bold: true,
                 size: 22,

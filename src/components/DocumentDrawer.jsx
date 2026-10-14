@@ -361,18 +361,20 @@ export default function DocumentDrawer({
                                   {sec.code}  {sec.title}
                                 </h4>
                                 <div className="flex items-center space-x-2">
-                                  {currentChap.id === 'chap2' && (
-                                    <label className="cursor-pointer opacity-80 hover:opacity-100 px-2 py-0.5 rounded bg-slate-200 hover:bg-amber-100 text-[10px] font-semibold text-slate-700 hover:text-amber-900 flex items-center space-x-1 transition">
-                                      <ImageIcon className="w-3 h-3 text-amber-600" />
-                                      <span>{sec.image ? 'Badili Picha' : '+ Picha'}</span>
-                                      <input
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        onChange={(e) => handleImageUpload(currentChap.id, sec.id, e.target.files[0])}
-                                      />
-                                    </label>
-                                  )}
+                                  <label className="cursor-pointer opacity-85 hover:opacity-100 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-300 text-[11px] font-semibold text-amber-900 flex items-center space-x-1.5 transition shadow-sm">
+                                    <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
+                                    <span>{sec.image ? 'Badili Picha' : '+ Weka Picha'}</span>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        if (e.target.files?.[0]) {
+                                          handleImageUpload(currentChap.id, sec.id, e.target.files[0]);
+                                        }
+                                      }}
+                                    />
+                                  </label>
 
                                   {currentChap.id === 'chap2' && sec.code.startsWith('2.2') && (
                                     <button
@@ -395,21 +397,29 @@ export default function DocumentDrawer({
 
                               {/* Attached Image Preview */}
                               {sec.image && (
-                                <div className="my-3 p-2 rounded-lg bg-slate-100 border border-slate-300 text-center relative group/img">
+                                <div className="my-3 p-3 rounded-xl bg-slate-100 border border-slate-300 text-center relative group/img shadow-sm">
                                   <img
                                     src={sec.image}
                                     alt={sec.imageCaption || sec.title}
-                                    className="max-h-60 mx-auto rounded object-contain shadow-sm"
+                                    className="max-h-72 mx-auto rounded-lg object-contain shadow-sm bg-white p-1"
                                   />
-                                  <div className="mt-1.5 flex items-center justify-center space-x-2 text-[11px] font-bold text-slate-800">
-                                    <span>Figure 2.{secIdx + 1}:</span>
+                                  <div className="mt-2 flex items-center justify-center space-x-2 text-[11px] font-bold text-slate-800">
+                                    <span>Figure {currentChap.number}.{secIdx + 1}:</span>
                                     <input
                                       type="text"
-                                      value={sec.imageCaption || `${sec.title} Execution and Testing Setup`}
+                                      value={sec.imageCaption || `${sec.title}`}
                                       onChange={(e) => onUpdateSection(currentChap.id, sec.id, { imageCaption: e.target.value })}
-                                      className="bg-transparent border-b border-dashed border-slate-400 px-1 py-0.5 text-[11px] text-center focus:outline-none focus:border-amber-500 max-w-sm"
+                                      className="bg-transparent border-b border-dashed border-slate-400 px-2 py-0.5 text-[11px] text-center focus:outline-none focus:border-amber-500 max-w-sm"
+                                      placeholder="Andika maelezo ya picha (Caption)..."
                                     />
                                   </div>
+                                  <button
+                                    onClick={() => onUpdateSection(currentChap.id, sec.id, { image: null, imageCaption: null })}
+                                    className="absolute top-2 right-2 p-1 rounded bg-red-600 hover:bg-red-700 text-white shadow cursor-pointer"
+                                    title="Ondoa picha"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
                               )}
 

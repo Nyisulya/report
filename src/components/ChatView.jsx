@@ -28,7 +28,10 @@ import {
   Maximize2,
   FileDown,
   Plus,
-  X
+  X,
+  BookCheck,
+  PenTool,
+  Lock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sendChatMessageToAI, DEFAULT_MODEL } from '../services/aiEngine.js';
@@ -50,6 +53,7 @@ export default function ChatView({
   onOpenProfile,
   onOpenStructures,
   onOpenLogbook,
+  onSyncAllLogbooks,
   onOpenAdmin,
   onSelectChapter,
   isSplitView,
@@ -61,7 +65,14 @@ export default function ChatView({
   onGoogleLogout,
   onSyncGoogleProfile
 }) {
+  const [logbookMode, setLogbookMode] = useState(() => {
+    return localStorage.getItem('dit_logbook_mode') || null;
+  });
+
   const [messages, setMessages] = useState(() => {
+    const savedMode = localStorage.getItem('dit_logbook_mode');
+    if (!savedMode) return [];
+
     const savedChat = localStorage.getItem('dit_chat_messages_v4') || localStorage.getItem('dit_chat_messages_v3');
     if (savedChat) {
       try {
@@ -80,36 +91,7 @@ export default function ChatView({
         console.error('Failed to parse saved chat:', e);
       }
     }
-
-    const uniName = reportData?.metadata?.universityName || 'DIT';
-    const hasStudentName = !!reportData?.metadata?.studentName;
-
-    if (hasStudentName) {
-      return [
-        {
-          id: 'welcome_back',
-          sender: 'ai',
-          text: `Karibu tena ${reportData.metadata.studentName}! Ripoti yako ya Field (IPT) inaendelea kuandaliwa na kusawazishwa moja kwa moja kwenye karatasi ya A4 hapo pembeni. 📄\n\nTuanze kuandaa au kuboresha Sura ipi sasa?`,
-          chips: [
-            '📖 Logbook ya Wiki',
-            'Chapter 1: Company Overview',
-            'Chapter 2: Technical Duties Undertaken',
-            'Chapter 3: Skills & Methodology',
-            'Chapter 4: Gaps in Skills & Tech',
-            'Chapter 5: Conclusions & Recommendations'
-          ]
-        }
-      ];
-    }
-
-    return [
-      {
-        id: 'welcome',
-        sender: 'ai',
-        text: `Habari ndugu mwanafunzi! Karibu sana kwenye **Field Report AI Assistant**. 🎓\n\nNipo hapa kukuandikia ripoti yako rasmi ya **Industrial Practical Training (IPT)** kuanzia mwanzo hadi mwisho kulingana na viwango rasmi vya kitaaluma. Kila kitu kinachoandikwa kinaingia moja kwa moja kwenye **A4 Document hapo pembeni**.\n\nTuanze kwa kukamilisha **Cover Page** yako: **Jina lako kamili la mwanafunzi unaitwa nani?**`,
-        chips: ['FELICIAN JOHN MUSSA', 'CHILLU JOHN MWITA', 'JUMA ALLY SELEMANI', 'NEEMA A. MWAKYUSA']
-      }
-    ];
+    return [];
   });
 
   const [inputVal, setInputVal] = useState('');
@@ -131,6 +113,29 @@ export default function ChatView({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  const handleSelectLogbookMode = async (mode) => {
+    setLogbookMode(mode);
+    try {
+      localStorage.setItem('dit_logbook_mode', mode);
+    } catch (e) {}
+
+    if (mode === 'filled') {
+      const logbooksCount = reportData?.logbooks?.length || 0;
+      if (logbooksCount > 0) {
+        if (onSyncAllLogbooks) {
+          onSyncAllLogbooks(reportData.logbooks);
+        }
+        confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
+        await handleSend('Nishajaza logbook tayari kwenye mfumo huu. Nisaidie kuhamisha taarifa zote kwenye Ripoti yangu ya chuo.');
+      } else {
+        await handleSend('Nishajaza logbook tayari, nataka kuweka taarifa zake kwenye ripoti yangu.');
+      }
+    } else {
+      confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
+      await handleSend('Sijajaza logbook kwenye mfumo huu, nataka tuanze kuandaa ripoti yangu ya chuo kuanzia mwanzo hatua kwa hatua.');
+    }
+  };
 
   // Handle user sending a message
   const handleSend = async (textToSend) => {
@@ -190,22 +195,8 @@ export default function ChatView({
         }
       }
 
-      // Generate contextual chips if AI did not provide any
-      let finalChips = aiResponse.chips || [];
-      if (finalChips.length === 0) {
-        const lowerReply = aiResponse.text.toLowerCase();
-        if (lowerReply.includes('chapter') || lowerReply.includes('sura')) {
-          finalChips = [
-            'Chapter 1: Company Overview',
-            'Chapter 2: Technical Duties',
-            'Chapter 3: Skills & Methodology',
-            'Chapter 4: Gaps in Skills & Tech',
-            'Chapter 5: Recommendations'
-          ];
-        } else {
-          finalChips = ['Ongeza Kazi Nyingine', 'Tazama Document (A4)', 'Nenda Chapter Inayofuata'];
-        }
-      }
+      // Keep only focused chips returned by AI for that specific question
+      let finalChips = Array.isArray(aiResponse.chips) ? aiResponse.chips : [];
 
       const aiMsg = {
         id: `ai_${Date.now()}`,
@@ -306,112 +297,259 @@ export default function ChatView({
         </div>
       </header>
 
-      {/* Main Chat Stream */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-6 w-full mx-auto space-y-5 max-w-3xl">
-        {messages.map(msg => (
-          <div
-            key={msg.id}
-            className={`flex items-start space-x-3 ${
-              msg.sender === 'user' ? 'justify-end' : 'justify-start'
-            }`}
-          >
-            {msg.sender === 'ai' && (
-              <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5 shadow-inner">
-                <Bot className="w-4 h-4" />
+      {/* Main Content Area: If no mode selected, show clean welcoming explanation card; otherwise show active chat stream */}
+      {!logbookMode ? (
+        <div className="flex-1 overflow-y-auto px-4 py-8 md:px-6 w-full mx-auto flex items-center justify-center max-w-2xl">
+          <div className="w-full p-6 sm:p-7 rounded-3xl bg-gradient-to-b from-[#262626] to-[#1c1c1c] border border-[#3d3d3d] shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header with Icon */}
+            <div className="flex items-center space-x-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-inner shrink-0">
+                <GraduationCap className="w-6 h-6" />
               </div>
-            )}
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
+                  <span>Field Report AI Assistant</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
+                    IPT Copilot
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Mwongozo rasmi wa kuandaa ripoti kamili ya kitaaluma (Chapter 1 hadi 5) ya kukusanya chuoni.
+                </p>
+              </div>
+            </div>
 
-            <div className={`max-w-xl space-y-2.5 ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
-              {/* Message Bubble */}
-              <div
-                className={`p-3.5 rounded-2xl text-sm leading-relaxed ${
-                  msg.sender === 'user'
-                    ? 'bg-amber-500 text-slate-950 font-medium rounded-tr-none shadow-md'
-                    : 'bg-[#2a2a2a] text-slate-100 border border-[#383838] rounded-tl-none shadow-lg'
-                }`}
+            {/* Maelezo Mazuri (Clear Explanations) */}
+            <div className="p-4 rounded-2xl bg-[#141414]/80 border border-[#2e2e2e] text-xs text-slate-300 leading-relaxed space-y-2">
+              <p className="font-semibold text-slate-200">
+                Habari ndugu mwanafunzi! Karibu kwenye mfumo wako wa kuandaa ripoti ya Field.
+              </p>
+              <p className="text-slate-400">
+                Mfumo huu unakuandalia ripoti kamili inayokidhi vigezo vya chuo chako (A4 Document pembeni). Ili tukusaidie kwa usahihi, tafadhali chagua mojawapo ya vitufe viwili hapa chini kuanza:
+              </p>
+            </div>
+
+            {/* The 2 Core Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+              {/* Button 1: Nishajaza Logbook */}
+              <button
+                type="button"
+                onClick={() => handleSelectLogbookMode('filled')}
+                className="group relative p-4 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between bg-[#242424] hover:bg-emerald-500/10 border-[#3a3a3a] hover:border-emerald-500/60 hover:shadow-[0_0_20px_rgba(16,185,129,0.15)] cursor-pointer"
               >
-                <div className="whitespace-pre-wrap">{msg.text}</div>
-
-                {/* Quick Document Status Banner */}
-                {msg.actionData && (
-                  <div className="mt-2.5 pt-2 border-t border-[#383838] flex items-center justify-between">
-                    <span className="text-[11px] text-amber-300 font-medium flex items-center space-x-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>
-                        {msg.actionData.metadata || msg.actionData.action === 'update_metadata'
-                          ? 'Imejazwa kwenye Cover Page'
-                          : msg.actionData.task || msg.actionData.action === 'add_task'
-                          ? 'Imeandikwa kwenye Chapter 2 (Tasks)'
-                          : 'Imeandikwa kwenye Document'}
-                      </span>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/15 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-slate-950 transition">
+                    <BookCheck className="w-5 h-5" />
+                  </div>
+                  {(reportData?.logbooks?.length || 0) > 0 ? (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30">
+                      Wiki {reportData.logbooks.length} Zipo
                     </span>
-                    <button
-                      onClick={() => {
-                        const tab = (msg.actionData.metadata || msg.actionData.action === 'update_metadata')
-                          ? 'cover'
-                          : (msg.actionData.task || msg.actionData.action === 'add_task')
-                          ? 'chap2'
-                          : msg.actionData.chapterId || 'cover';
-                        onSelectChapter(tab);
-                      }}
-                      className="px-2.5 py-0.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-semibold text-[11px] flex items-center space-x-1 transition"
-                    >
-                      <Eye className="w-3 h-3 text-amber-400" />
-                      <span>Kagua Kwenye Docs 📄</span>
-                    </button>
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 font-medium">
+                      Vuna Data
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100 group-hover:text-emerald-300 transition flex items-center justify-between">
+                    <span>Nishajaza Logbook</span>
+                    <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition transform group-hover:translate-x-1 text-emerald-400" />
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-1.5 leading-normal">
+                    Kazi zako zote za wiki zitahamishwa moja kwa moja kuingia kwenye Chapter 2 na Chapter 3 bila kuanza upya.
+                  </p>
+                </div>
+              </button>
+
+              {/* Button 2: Sijajaza Logbook */}
+              <button
+                type="button"
+                onClick={() => handleSelectLogbookMode('not_filled')}
+                className="group relative p-4 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between bg-[#242424] hover:bg-amber-500/10 border-[#3a3a3a] hover:border-amber-500/60 hover:shadow-[0_0_20px_rgba(245,158,11,0.15)] cursor-pointer"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/15 text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 transition">
+                    <PenTool className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold border border-amber-500/30">
+                    Hatua kwa Hatua
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-300 transition flex items-center justify-between">
+                    <span>Sijajaza Logbook</span>
+                    <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition transform group-hover:translate-x-1 text-amber-400" />
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-1.5 leading-normal">
+                    AI itakuhoji maswali mafupi ya kirafiki hatua kwa hatua ili kukuandikia ripoti nzima ya chuo kuanzia mwanzo hadi mwisho.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <div className="pt-2 text-center text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Chagua mojawapo ya vitufe viwili hapo juu ili kufungua sehemu ya kuandika hapa chini.</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Main Chat Stream when mode is active */
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 w-full mx-auto space-y-4 max-w-3xl">
+          {/* Active Mode Banner */}
+          <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#262626] border border-[#383838] shadow-sm text-xs">
+            <div className="flex items-center space-x-2 truncate">
+              {logbookMode === 'filled' ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span className="font-semibold text-emerald-300 shrink-0">Hali Yako:</span>
+                  <span className="text-slate-300 truncate">Nishajaza Logbook (Uvunaji wa Data za Wiki)</span>
+                </>
+              ) : (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                  <span className="font-semibold text-amber-300 shrink-0">Hali Yako:</span>
+                  <span className="text-slate-300 truncate">Sijajaza Logbook (Kuandika Hatua kwa Hatua)</span>
+                </>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setLogbookMode(null);
+                setMessages([]);
+                try {
+                  localStorage.removeItem('dit_logbook_mode');
+                  localStorage.removeItem('dit_chat_messages_v4');
+                } catch (e) {}
+              }}
+              className="text-amber-400 hover:text-amber-300 font-semibold underline text-[11px] shrink-0 ml-2 cursor-pointer transition"
+              title="Badili jinsi unavyotaka ripoti iandaliwe"
+            >
+              Badili Njia
+            </button>
+          </div>
+
+          {messages.map(msg => (
+            <div
+              key={msg.id}
+              className={`flex items-start space-x-3 ${
+                msg.sender === 'user' ? 'justify-end' : 'justify-start'
+              }`}
+            >
+              {msg.sender === 'ai' && (
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5 shadow-inner">
+                  <Bot className="w-4 h-4" />
+                </div>
+              )}
+
+              <div className={`max-w-xl space-y-2.5 ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                {/* Message Bubble */}
+                <div
+                  className={`p-3.5 rounded-2xl text-sm leading-relaxed ${
+                    msg.sender === 'user'
+                      ? 'bg-amber-500 text-slate-950 font-medium rounded-tr-none shadow-md'
+                      : 'bg-[#2a2a2a] text-slate-100 border border-[#383838] rounded-tl-none shadow-lg'
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap">{msg.text}</div>
+
+                  {/* Quick Document Status Banner */}
+                  {msg.actionData && (
+                    <div className="mt-2.5 pt-2 border-t border-[#383838] flex items-center justify-between">
+                      <span className="text-[11px] text-amber-300 font-medium flex items-center space-x-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>
+                          {msg.actionData.metadata || msg.actionData.action === 'update_metadata'
+                            ? 'Imejazwa kwenye Cover Page'
+                            : msg.actionData.task || msg.actionData.action === 'add_task'
+                            ? 'Imeandikwa kwenye Chapter 2 (Tasks)'
+                            : 'Imeandikwa kwenye Document'}
+                        </span>
+                      </span>
+                      <button
+                        onClick={() => {
+                          const tab = (msg.actionData.metadata || msg.actionData.action === 'update_metadata')
+                            ? 'cover'
+                            : (msg.actionData.task || msg.actionData.action === 'add_task')
+                            ? 'chap2'
+                            : msg.actionData.chapterId || 'cover';
+                          onSelectChapter(tab);
+                        }}
+                        className="px-2.5 py-0.5 rounded-md bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-semibold text-[11px] flex items-center space-x-1 transition"
+                      >
+                        <Eye className="w-3 h-3 text-amber-400" />
+                        <span>Kagua Kwenye Docs 📄</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Dynamic Quick Action Chips */}
+                {msg.chips && msg.chips.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {msg.chips.map((chip, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          if (chip.includes('Nishajaza Logbook')) {
+                            handleSelectLogbookMode('filled');
+                          } else if (chip.includes('Sijajaza Logbook')) {
+                            handleSelectLogbookMode('not_filled');
+                          } else if (chip.includes('Logbook') && onOpenLogbook) {
+                            onOpenLogbook();
+                          } else {
+                            handleSend(chip);
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-full bg-[#1c1c1c] hover:bg-[#282828] border border-[#383838] hover:border-amber-500/50 text-xs text-slate-300 hover:text-amber-300 transition shadow-sm text-left flex items-center space-x-1 cursor-pointer"
+                      >
+                        <span>{chip}</span>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
 
-              {/* Dynamic Quick Action Chips */}
-              {msg.chips && msg.chips.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {msg.chips.map((chip, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        if (chip.includes('Logbook') && onOpenLogbook) {
-                          onOpenLogbook();
-                        } else {
-                          handleSend(chip);
-                        }
-                      }}
-                      className="px-2.5 py-1 rounded-full bg-[#1c1c1c] hover:bg-[#282828] border border-[#383838] hover:border-amber-500/50 text-xs text-slate-300 hover:text-amber-300 transition shadow-sm text-left flex items-center space-x-1"
-                    >
-                      <span>{chip}</span>
-                    </button>
-                  ))}
+              {msg.sender === 'user' && (
+                <div className="w-8 h-8 rounded-xl bg-slate-700 flex items-center justify-center text-slate-200 shrink-0 mt-0.5">
+                  <User className="w-4 h-4" />
                 </div>
               )}
             </div>
+          ))}
 
-            {msg.sender === 'user' && (
-              <div className="w-8 h-8 rounded-xl bg-slate-700 flex items-center justify-center text-slate-200 shrink-0 mt-0.5">
-                <User className="w-4 h-4" />
+          {/* Loading Indicator */}
+          {isLoading && (
+            <div className="flex items-center space-x-3 text-slate-400 text-xs animate-pulse bg-[#1a1a1a] p-3 rounded-xl border border-[#2e2e2e] w-fit">
+              <div className="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
               </div>
-            )}
-          </div>
-        ))}
-
-        {/* Loading Indicator */}
-        {isLoading && (
-          <div className="flex items-center space-x-3 text-slate-400 text-xs animate-pulse bg-[#1a1a1a] p-3 rounded-xl border border-[#2e2e2e] w-fit">
-            <div className="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span>AI inaandika moja kwa moja kwenye Document yako...</span>
             </div>
-            <span>AI inaandika moja kwa moja kwenye Document yako...</span>
-          </div>
-        )}
+          )}
 
-        <div ref={messagesEndRef} />
-      </div>
+          <div ref={messagesEndRef} />
+        </div>
+      )}
 
       {/* Input Box Bar */}
       <div className="p-3.5 border-t border-[#2e2e2e] bg-[#1a1a1a]/95 backdrop-blur shrink-0">
-        <div className="max-w-3xl mx-auto flex items-end space-x-2 bg-[#262626] rounded-2xl border border-[#3a3a3a] p-2 focus-within:border-amber-500/80 transition-all shadow-xl">
+        <div className={`max-w-3xl mx-auto flex items-end space-x-2 rounded-2xl border p-2 transition-all shadow-xl ${
+          !logbookMode
+            ? 'bg-[#202020] border-[#303030] opacity-60'
+            : 'bg-[#262626] border-[#3a3a3a] focus-within:border-amber-500/80'
+        }`}>
+          {!logbookMode && (
+            <div className="p-2 text-amber-400/80 shrink-0">
+              <Lock className="w-4 h-4" />
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             rows={1}
+            disabled={!logbookMode || isLoading}
             value={inputVal}
             onChange={(e) => {
               setInputVal(e.target.value);
@@ -424,19 +562,31 @@ export default function ChatView({
                 handleSend();
               }
             }}
-            placeholder="Ongea na AI (k.m. Jina langu ni..., tulifanya LAN cabling...)..."
-            className="flex-1 bg-transparent px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none max-h-28 leading-relaxed"
+            placeholder={
+              !logbookMode
+                ? 'Tafadhali chagua mojawapo ya vitufe vilivyo hapo juu ili uanze...'
+                : 'Ongea na AI (k.m. Jina langu ni..., tulifanya LAN cabling...)...'
+            }
+            className={`flex-1 bg-transparent px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none max-h-28 leading-relaxed ${
+              !logbookMode ? 'cursor-not-allowed' : ''
+            }`}
           />
           <button
             onClick={() => handleSend()}
-            disabled={!inputVal.trim() || isLoading}
-            className="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-30 disabled:hover:bg-amber-500 text-slate-950 font-bold transition shrink-0 shadow"
+            disabled={!logbookMode || !inputVal.trim() || isLoading}
+            className="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-30 disabled:hover:bg-amber-500 text-slate-950 font-bold transition shrink-0 shadow disabled:cursor-not-allowed cursor-pointer"
           >
             <Send className="w-4 h-4" />
           </button>
         </div>
         <p className="text-[10px] text-center text-slate-500 mt-1.5">
-          Maudhui yote ya kiufundi yanaandikwa moja kwa moja kwenye Document yako hapo kulia.
+          {!logbookMode ? (
+            <span className="text-amber-400/90 font-medium">
+              Chagua kitufe kimoja hapo juu ili ufungue sehemu hii ya kuandika.
+            </span>
+          ) : (
+            'Maudhui yote ya kiufundi yanaandikwa moja kwa moja kwenye Document yako hapo kulia.'
+          )}
         </p>
       </div>
     </div>
