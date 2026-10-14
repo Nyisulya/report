@@ -505,7 +505,7 @@ export default function App() {
       await exportDITReportToDocx(reportData);
     } catch (err) {
       console.error('Export error:', err);
-      alert('Imeshindwa kutengeneza Word document. Tafadhali jaribu tena.');
+      alert(`Imeshindwa kutengeneza Word document: ${err?.message || 'Tafadhali jaribu tena.'}`);
     } finally {
       setIsExporting(false);
     }

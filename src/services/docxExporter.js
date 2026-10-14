@@ -271,7 +271,7 @@ export async function exportDITReportToDocx(reportData) {
             ]
           })
         },
-        children: buildChaptersParagraphs(chapters, metadata)
+        children: buildChaptersParagraphs(chapters, metadata, dynamicFigures)
       }
     ]
   });
@@ -622,7 +622,7 @@ function buildTableOfContentsTable(toc = []) {
   });
 }
 
-function buildChaptersParagraphs(chapters = [], metadata = {}) {
+function buildChaptersParagraphs(chapters = [], metadata = {}, dynamicFigures = []) {
   const elements = [];
   const uniName = metadata.universityName || 'Dar es Salaam Institute of Technology (DIT)';
 
@@ -696,6 +696,14 @@ function buildChaptersParagraphs(chapters = [], metadata = {}) {
       // Section Figure image & caption
       if (sec.image) {
         try {
+          let mimeType = 'jpg';
+          if (typeof sec.image === 'string' && sec.image.startsWith('data:image/')) {
+            const matched = sec.image.match(/data:image\/([a-zA-Z0-9]+);base64,/);
+            if (matched && matched[1]) {
+              const ext = matched[1].toLowerCase();
+              mimeType = ext === 'jpeg' ? 'jpg' : (ext === 'png' ? 'png' : 'jpg');
+            }
+          }
           const base64Data = sec.image.includes(',') ? sec.image.split(',')[1] : sec.image;
           const binaryString = atob(base64Data);
           const bytes = new Uint8Array(binaryString.length);
@@ -712,7 +720,8 @@ function buildChaptersParagraphs(chapters = [], metadata = {}) {
                   transformation: {
                     width: 440,
                     height: 280
-                  }
+                  },
+                  type: mimeType
                 })
               ]
             })
@@ -720,28 +729,30 @@ function buildChaptersParagraphs(chapters = [], metadata = {}) {
         } catch (imgErr) {
           console.warn('Could not embed image into DOCX:', imgErr);
         }
-      }
 
-      if (sec.image) {
-        const figEntry = dynamicFigures.find(f => f.sectionId === sec.id);
-        const figNo = figEntry ? figEntry.figureNo : `Figure ${chap.number}.${secIdx + 1}`;
-        const figCaption = cleanFigureCaption(sec.imageCaption, sec.title);
+        try {
+          const figEntry = (dynamicFigures || []).find(f => f.sectionId === sec.id);
+          const figNo = figEntry ? figEntry.figureNo : `Figure ${chap.number}.${secIdx + 1}`;
+          const figCaption = cleanFigureCaption(sec.imageCaption, sec.title);
 
-        elements.push(
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 60, after: 160 },
-            children: [
-              new TextRun({
-                text: `${figNo}: ${figCaption}`,
-                italics: true,
-                bold: true,
-                size: 22,
-                color: '333333'
-              })
-            ]
-          })
-        );
+          elements.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 60, after: 160 },
+              children: [
+                new TextRun({
+                  text: `${figNo}: ${figCaption}`,
+                  italics: true,
+                  bold: true,
+                  size: 22,
+                  color: '333333'
+                })
+              ]
+            })
+          );
+        } catch (figErr) {
+          console.warn('Could not add figure caption into DOCX:', figErr);
+        }
       }
     });
   });
