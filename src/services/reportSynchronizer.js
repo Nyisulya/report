@@ -229,21 +229,99 @@ export function autoExtractCoverMetadata(text, currentMeta = {}, currentStepId =
     return meta;
   }
 
-  // 2. Generic heuristics if no explicit step
-  if (lower.includes('beng') || lower.includes('engineering') || lower.includes('nta')) {
-    if (lower.includes('electrical')) meta.department = 'Electrical Engineering';
-    else if (lower.includes('civil')) meta.department = 'Civil Engineering';
-    else if (lower.includes('computer')) meta.department = 'Computer Studies';
-    else meta.department = 'Computer Studies';
-
-    const codeMatch = trimmed.match(/\b([A-Z]{2,6}\d{2}[A-Z0-9]*)\b/i);
-    meta.classCode = codeMatch ? codeMatch[0].toUpperCase() : 'BENG23EE';
-    meta.ntaLevel = lower.includes('nta 6') ? 'NTA LEVEL 6' : 'NTA LEVEL 7';
-    meta.program = `BACHELOR OF ENGINEERING IN ${meta.department.toUpperCase()}`;
+  // 2. Comprehensive multi-field heuristics for conversational inputs
+  // Student Name
+  if (!meta.studentName) {
+    const nameMatch = trimmed.match(/(?:naitwa|jina\s+langu\s+ni|mimi\s+ni)\s+([A-Za-z]+(?:\s+[A-Za-z]+){1,3})/i);
+    if (nameMatch && nameMatch[1]) {
+      meta.studentName = nameMatch[1].trim().toUpperCase();
+    }
   }
 
-  if (lower.includes('ttcl') || lower.includes('tanesco') || lower.includes('uatc') || lower.includes('tra') || lower.includes('vodacom')) {
-    meta.firm = trimmed.toUpperCase();
+  // Admission / Reg Number
+  if (!meta.admissionNo) {
+    const regMatch = trimmed.match(/\b(\d{10,12}|\d{2}\/\d{4}\/\w+|\d{4}-\d{2}-\d{5}|IMC\/[A-Z0-9\/]+)\b/i);
+    if (regMatch) {
+      meta.admissionNo = regMatch[1].trim().toUpperCase();
+    }
+  }
+
+  // Department & Class & Program & NTA Level
+  if (lower.includes('electrical') || lower.includes('umeme')) {
+    meta.department = 'Electrical Engineering';
+  } else if (lower.includes('civil') || lower.includes('ujenzi')) {
+    meta.department = 'Civil Engineering';
+  } else if (lower.includes('mechanical')) {
+    meta.department = 'Mechanical Engineering';
+  } else if (lower.includes('computer') || lower.includes('coe') || lower.includes('tehama') || lower.includes('it')) {
+    meta.department = 'Computer Studies';
+  }
+
+  const codeMatch = trimmed.match(/\b(BENG\d{2}[A-Z0-9]+|OD\d{2}[A-Z0-9]+|HD\d{2}[A-Z0-9]+)\b/i);
+  if (codeMatch) {
+    meta.classCode = codeMatch[1].toUpperCase();
+  }
+
+  if (lower.includes('nta 6') || lower.includes('diploma') || (meta.classCode && meta.classCode.startsWith('OD'))) {
+    meta.ntaLevel = 'NTA LEVEL 6';
+    meta.program = `ORDINARY DIPLOMA IN ${(meta.department || 'ENGINEERING').toUpperCase()}`;
+  } else if (lower.includes('beng') || lower.includes('degree') || lower.includes('bachelor') || lower.includes('nta 7') || (meta.classCode && meta.classCode.startsWith('BENG'))) {
+    meta.ntaLevel = 'NTA LEVEL 7';
+    meta.program = `BACHELOR OF ENGINEERING IN ${(meta.department || 'ENGINEERING').toUpperCase()}`;
+  }
+
+  // Module (Default IPT)
+  if (!meta.module) {
+    meta.module = 'INDUSTRIAL PRACTICAL TRAINING (IPT)';
+  }
+
+  // Host Firm / Company
+  const firmPatterns = [
+    /\b(TTCL(?:\s+KURASINI|\s+HQ)?)\b/i,
+    /\b(TANESCO(?:\s+UBUNGO)?)\b/i,
+    /\b(VODACOM(?:\s+TANZANIA)?)\b/i,
+    /\b(AIRTEL(?:\s+TANZANIA)?)\b/i,
+    /\b(TIGO(?:\s+TANZANIA)?)\b/i,
+    /\b(CRDB(?:\s+BANK)?)\b/i,
+    /\b(NMB(?:\s+BANK)?)\b/i,
+    /\b(TRA(?:\s+SAMORA)?)\b/i,
+    /\b(UATC|THE UNITED AFRICAN TECHNICAL COLLEGE)\b/i,
+    /\b(NSSF|TCRA|E-GA|NHIF|TAZARA|TRC|DAWASA|TPA|PCCB|TBS|TPDC)\b/i,
+    /(?:kampuni\s+ya|shirika\s+la|field\s+(?:nilifanya|pale|kwenye))\s+([A-Za-z0-9&.-]+(?:\s+[A-Za-z0-9&.-]+){0,3})/i
+  ];
+  if (!meta.firm) {
+    for (const pat of firmPatterns) {
+      const match = trimmed.match(pat);
+      if (match) {
+        meta.firm = (match[1] || match[0]).trim().toUpperCase();
+        break;
+      }
+    }
+  }
+
+  // Supervisors
+  const firmSupMatch = trimmed.match(/(?:kazini|firm\s+supervisor|supervisor\s+wa\s+kazini)[:\s]+((?:Eng\.|Dr\.|Mr\.|Ms\.|Mrs\.)?\s*[A-Za-z]+(?:\s+[A-Za-z]+){1,2})/i);
+  if (firmSupMatch) {
+    meta.firmSupervisor = firmSupMatch[1].trim();
+  }
+  const instSupMatch = trimmed.match(/(?:chuoni|dit|institute\s+supervisor|supervisor\s+wa\s+chuoni|mwalimu)[:\s]+((?:Dr\.|Prof\.|Eng\.|Mr\.|Ms\.)?\s*[A-Za-z]+(?:\s+[A-Za-z]+){1,2})/i);
+  if (instSupMatch) {
+    meta.instituteSupervisor = instSupMatch[1].trim();
+  }
+
+  // Academic Year
+  const yearMatch = trimmed.match(/\b(202\d\/202\d)\b/);
+  if (yearMatch) {
+    meta.academicYear = yearMatch[1];
+  } else if (!meta.academicYear) {
+    meta.academicYear = '2024/2025';
+  }
+
+  // Field Span
+  const spanMatch = trimmed.match(/(?:FROM\s+[A-Za-z0-9\s]+\s+TO\s+[A-Za-z0-9\s]+|kuanzia\s+[A-Za-z0-9\s]+\s+hadi\s+[A-Za-z0-9\s]+)/i);
+  if (spanMatch) {
+    const rawSpan = spanMatch[0].toUpperCase();
+    meta.fieldSpan = rawSpan.replace(/KUANZIA\s+/i, 'FROM ').replace(/\s+HADI\s+/i, ' TO ');
   }
 
   return meta;

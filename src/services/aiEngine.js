@@ -309,14 +309,33 @@ function buildMasterSystemPrompt(reportData) {
      - You must complete Chapter 2 before moving to Chapter 3.
      - Exception: ONLY if the entire report is 100% finished and the student explicitly asks to edit an earlier chapter.
 
-   • STEP 1: COVER PAGE SEQUENTIAL INTERVIEW (ONE QUESTION PER TURN):
-     - If studentName is missing: Ask ONLY: "Jina lako kamili la mwanafunzi unaitwa nani?"
-     - If studentName is known but admissionNo is missing: In json_action, update metadata.studentName. In chat, ask ONLY: "Namba yako ya usajili (Admission / Registration Number) ni ipi?"
-     - If admissionNo is known but program is missing: In json_action, update metadata.admissionNo. In chat, ask ONLY: "Programu au kozi unayosoma chuoni inaitwaje?"
-     - If program is known but department is missing: In json_action, update metadata.program. In chat, ask ONLY: "Idara (Department) yako chuoni ni ipi?"
-     - If department is known but firm is missing: In json_action, update metadata.department. In chat, ask ONLY: "Kampuni au shirika ulilofanyia field linaitwaje?"
-     - If firm is known but location is missing: In json_action, update metadata.firm. In chat, ask ONLY: "Kampuni hii inapatikana mkoa au eneo gani?"
-     - Once location is provided: In json_action, update metadata.firmLocation. Cover Page is now 100% complete! In chat, say: "Jalada (Cover Page) limekamilika kikamilifu! Sasa tunaanza rasmi Sura ya Kwanza (Chapter 1: Company Profile)."
+   • STEP 1: OFFICIAL COVER PAGE INTERVIEW (12 MANDATORY DIT FIELDS):
+     Official Cover Page for ${uniShort} requires EXACTLY these 12 fields:
+       1. studentName: Full student name (e.g. FELICIAN JOHN MUSSA)
+       2. department: Academic Department (e.g. COMPUTER STUDIES, ELECTRICAL ENGINEERING, CIVIL ENGINEERING, MECHANICAL ENGINEERING)
+       3. admissionNo: Registration / Admission number (e.g. 21023022415)
+       4. program: Degree / Diploma Program (e.g. BACHELOR OF ENGINEERING IN COMPUTER ENGINEERING)
+       5. ntaLevel: NTA Level (e.g. NTA LEVEL 7 for Degree, NTA LEVEL 6 for Diploma)
+       6. classCode: Class code (e.g. BENG23COE, OD22COE, BENG23EE)
+       7. module: Module title (Default: INDUSTRIAL PRACTICAL TRAINING (IPT))
+       8. firm: Host Company / Organization (e.g. TANESCO, TTCL, VODACOM TANZANIA, CRDB BANK)
+       9. firmSupervisor: Host Company Supervisor name & title (e.g. Eng. Godfrey Mwakyoma)
+       10. instituteSupervisor: University Academic Supervisor from ${uniShort} (e.g. Dr. J. M. Mtebe)
+       11. academicYear: Academic Year (e.g. 2024/2025)
+       12. fieldSpan: Training duration span (e.g. FROM 5 AUGUST 2024 TO 5 OCTOBER 2024)
+
+     • SMART MULTI-FIELD EXTRACTION LAW:
+       - Whenever the student mentions multiple details at once (e.g., student name, reg number, department, class code, host company, supervisors, or dates), you MUST extract and update ALL of them immediately into \`json_action.metadata\`!
+       - ⚠️ NEVER ask for any detail that the student has ALREADY stated or that is already in CURRENT LIVE DOCUMENT STATE!
+
+     • SEQUENTIAL GAPS INTERVIEW (Ask ONLY for what is still missing among the 6 key clusters):
+       - If studentName is missing: Ask ONLY: "Jina lako kamili la mwanafunzi unaitwa nani?"
+       - Else if admissionNo is missing: In json_action update studentName. In chat, ask ONLY: "Namba yako ya usajili (Admission / Registration Number) ni ipi?"
+       - Else if department, classCode, or program is missing: In json_action update admissionNo. In chat, ask ONLY: "Uko Idara gani na Program/Class Code yako ni ipi? (k.m. Computer Studies, BENG23COE)" with chips: ["Computer Studies | BENG23COE | NTA 7", "Electrical Engineering | BENG23EE | NTA 7", "Civil Engineering | BENG23CE | NTA 7", "Mechanical Engineering | BENG23ME | NTA 7", "Computer Studies | OD22COE | NTA 6"].
+       - Else if firm is missing: In chat, ask ONLY: "Ulifanya mafunzo ya vitendo (Field / IPT) katika Shirika au Kampuni gani?" with chips: ["TTCL Kurasini", "TANESCO Ubungo", "Vodacom Tanzania", "CRDB Bank", "TRA Samora"].
+       - Else if firmSupervisor or instituteSupervisor is missing: In chat, ask ONLY: "Taja majina ya wasimamizi wako (Supervisor wa Kazini na Supervisor wa Chuoni ${uniShort}):" with chips: ["Kazini: Eng. John | Chuoni: Dr. Mtebe", "Kazini: Dr. Tesha | Chuoni: Prof. Mohamed", "Kazini: Eng. Frank Temba | Chuoni: Eng. M. Nassoro"].
+       - Else if fieldSpan or academicYear is missing: In chat, ask ONLY: "Muda wa field ulikuwa lini hadi lini, na mwaka gani wa masomo?" with chips: ["FROM 5 AUGUST 2024 TO 5 OCTOBER 2024 | 2024/2025", "FROM 15 JULY 2024 TO 15 SEPTEMBER 2024 | 2024/2025"].
+       - Once all 12 fields are accounted for: In json_action, output the complete \`metadata\` object. In chat, enthusiastically announce: "Hongera sana! Jalada (Cover Page) lako la ${uniShort} lenye taarifa zote 12 rasmi sasa limekamilika 100%! Sasa tunaanza rasmi Sura ya Kwanza (Chapter 1: Company Profile)." And immediately ask the first question for Chapter 1!
 
    • STEP 2: CHAPTER 1 INTERVIEW (COMPANY OVERVIEW):
      - Ask ONLY: "Ulikuwa kwenye kitengo au idara gani hapo kampuni/kazini?"
@@ -383,15 +402,17 @@ ${chaptersOutline}
   "action": "update_metadata" | "update_chapter" | "add_task" | "update_preliminaries" | "generate_logbook" | "general_chat",
   "metadata": {
     "studentName": "...",
-    "admissionNo": "...",
     "department": "...",
+    "admissionNo": "...",
     "program": "...",
+    "ntaLevel": "NTA LEVEL 7" | "NTA LEVEL 6",
     "classCode": "...",
+    "module": "INDUSTRIAL PRACTICAL TRAINING (IPT)",
     "firm": "...",
     "firmSupervisor": "...",
     "instituteSupervisor": "...",
-    "academicYear": "...",
-    "fieldSpan": "..."
+    "academicYear": "2024/2025",
+    "fieldSpan": "FROM 5 AUGUST 2024 TO 5 OCTOBER 2024"
   },
   "chapterId": "chap1" | "chap2" | "chap3" | "chap4" | "chap5",
   "sections": [

@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sendChatMessageToAI, DEFAULT_MODEL } from '../services/aiEngine.js';
+import { autoExtractCoverMetadata } from '../services/reportSynchronizer.js';
 import GoogleAuthButton from './GoogleAuthButton.jsx';
 import { analyticsService } from '../services/analyticsService.js';
 
@@ -151,13 +152,27 @@ export default function ChatView({
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
 
+    // Immediate smart client-side metadata extraction (ensures zero loss of user-provided details)
+    const newlyExtracted = autoExtractCoverMetadata(text, reportData?.metadata || {});
+    let currentMetadata = reportData?.metadata || {};
+    let hasMetaChanges = false;
+    for (const [k, v] of Object.entries(newlyExtracted)) {
+      if (v && v !== currentMetadata[k]) {
+        currentMetadata = { ...currentMetadata, [k]: v };
+        hasMetaChanges = true;
+      }
+    }
+    if (hasMetaChanges) {
+      onSaveMetadata(currentMetadata);
+    }
+
     // 2. Call real DeepSeek AI directly
     setIsLoading(true);
 
     try {
       const aiResponse = await sendChatMessageToAI({
         messages: updatedMessages,
-        reportData,
+        reportData: { ...reportData, metadata: currentMetadata },
         apiKey: apiKey || '',
         modelName: activeModel || DEFAULT_MODEL
       });
